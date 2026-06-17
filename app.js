@@ -4412,6 +4412,8 @@ ${m.extractedText.substring(0, 3000)}
 
     // ── Init ──
     document.addEventListener('DOMContentLoaded', () => {
+      initSupabase();
+
       loadData();
       loadScheduleData();
       loadInterviewSettings();
@@ -4430,9 +4432,8 @@ ${m.extractedText.substring(0, 3000)}
         if (user) applyLogin(user);
       }
 
-
-
-
+      // Supabase에서 최신 데이터 풀기 (비동기)
+      loadFromSupabase();
     });
 
 
