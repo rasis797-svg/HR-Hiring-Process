@@ -2480,15 +2480,76 @@ ${m.extractedText.substring(0, 3000)}
       wrap.innerHTML = s.assignments.map(a => `
         <div class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid #eee">
           <div>
-            <div><strong>${escHtml(a.title)}</strong></div>
+            <div><strong class="link" style="cursor:pointer" onclick="viewAssignment('${a.id}')">${escHtml(a.title)}</strong></div>
             <div class="text-gray text-sm">${a.fileName ? '첨부파일: ' + escHtml(a.fileName) : '첨부파일 없음'} · 수정일 ${a.modified}</div>
           </div>
           <div class="flex gap-8">
             <button class="btn btn-secondary btn-sm" onclick="openAssignmentForm('${a.id}')">불러오기/수정</button>
             <button class="btn btn-secondary btn-sm" onclick="exportAssignment('${a.id}')">내보내기</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportAssignmentPdf('${a.id}')">PDF로 내보내기</button>
             <button class="btn btn-danger btn-sm" onclick="deleteAssignment('${a.id}')">삭제</button>
           </div>
         </div>`).join('');
+    }
+
+    function viewAssignment(id) {
+      const s = sheetsData[currentAssignmentPosIdx];
+      const a = s && (s.assignments || []).find(x => x.id === id);
+      if (!a) return;
+
+      const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+  <title>과제 — ${escHtml(a.title)}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:14px;color:#333;padding:32px;max-width:800px;margin:0 auto;line-height:1.7}
+    h1{font-size:20px;font-weight:700;margin-bottom:14px}
+    .meta{color:#888;font-size:12px;margin-bottom:24px;padding-bottom:14px;border-bottom:1px solid #eee}
+    .content{white-space:pre-wrap;font-size:14px}
+    .file-box{margin-top:24px;padding:14px 18px;background:#f8f8f8;border:1px solid #e0e0e0;border-radius:6px}
+    .file-box a{color:#3366dd;text-decoration:none;font-weight:600}
+  </style></head><body>
+  <h1>${escHtml(a.title)}</h1>
+  <div class="meta">포지션: ${escHtml(s.name)} · 생성일 ${a.created} · 수정일 ${a.modified}</div>
+  <div class="content">${escHtml(a.content || '(등록된 내용 없음)')}</div>
+  ${a.fileData ? `<div class="file-box">📎 첨부파일: <a href="${a.fileData}" download="${escHtml(a.fileName)}">${escHtml(a.fileName)}</a></div>` : ''}
+  </body></html>`;
+
+      const win = window.open('', '_blank');
+      if (!win) { showToast('팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.', 'error'); return; }
+      win.document.write(html);
+      win.document.close();
+    }
+
+    function exportAssignmentPdf(id) {
+      const s = sheetsData[currentAssignmentPosIdx];
+      const a = s && (s.assignments || []).find(x => x.id === id);
+      if (!a) return;
+
+      const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+  <title>과제 — ${escHtml(a.title)}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:14px;color:#333;padding:32px;max-width:800px;margin:0 auto;line-height:1.7}
+    h1{font-size:20px;font-weight:700;margin-bottom:14px}
+    .meta{color:#888;font-size:12px;margin-bottom:24px;padding-bottom:14px;border-bottom:1px solid #eee}
+    .content{white-space:pre-wrap;font-size:14px}
+    .footer{text-align:center;color:#aaa;font-size:11px;margin-top:40px;padding-top:14px;border-top:1px solid #eee}
+    @media print{
+      body{padding:16px}
+      @page{margin:15mm}
+    }
+  </style></head><body>
+  <h1>${escHtml(a.title)}</h1>
+  <div class="meta">포지션: ${escHtml(s.name)} · 생성일 ${a.created} · 수정일 ${a.modified}</div>
+  <div class="content">${escHtml(a.content || '(등록된 내용 없음)')}</div>
+  <div class="footer">채용매칭 시스템 · 과제 · ${new Date().toLocaleString('ko-KR')}</div>
+  <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`;
+
+      const win = window.open('', '_blank');
+      if (!win) { showToast('팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.', 'error'); return; }
+      win.document.write(html);
+      win.document.close();
     }
 
     function openAssignmentForm(editId) {
