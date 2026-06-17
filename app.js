@@ -864,10 +864,12 @@
       <td><span class="font-bold ${cls}">${m.score}</span>/5</td>
       <td>${sub1}</td><td>${sub2}</td><td>${sub3}</td>
       <td class="text-gray text-sm">${m.date}</td>
-      <td class="flex gap-8" style="flex-wrap:wrap">
-        <button class="btn btn-secondary btn-sm" onclick="openMatchResult(${realIdx})">결과 보기</button>
-        <button class="btn ${isRejected ? 'btn-secondary' : 'btn-danger'} btn-sm" onclick="toggleRejected(${realIdx})">${isRejected ? '취소' : '불합격'}</button>
-        <button class="btn btn-secondary btn-sm" style="color:#cc3333;border-color:#cc3333" onclick="deleteApplicant(${realIdx})">삭제</button>
+      <td>
+        <div style="display:flex;flex-direction:row;gap:6px;align-items:center;white-space:nowrap">
+          <button class="btn btn-secondary btn-sm" onclick="openMatchResult(${realIdx})">결과 보기</button>
+          <button class="btn ${isRejected ? 'btn-secondary' : 'btn-danger'} btn-sm" onclick="toggleRejected(${realIdx})">${isRejected ? '취소' : '불합격'}</button>
+          <button class="btn btn-secondary btn-sm" style="color:#cc3333;border-color:#cc3333" onclick="deleteApplicant(${realIdx})">삭제</button>
+        </div>
       </td>
     </tr>`;
       }).join('');
