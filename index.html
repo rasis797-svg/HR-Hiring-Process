@@ -284,12 +284,13 @@
                   <th>지원자</th>
                   <th>상태</th>
                   <th>생성일</th>
+                  <th>보관장소</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody id="positions-tbody">
                 <tr id="positions-empty">
-                  <td colspan="7">
+                  <td colspan="8">
                     <div class="empty-state">
                       <div class="empty-icon">💼</div>
                       <div class="empty-text">등록된 포지션이 없습니다. 설계시트를 생성하면 자동으로 포지션이 등록됩니다.</div>
@@ -974,29 +975,17 @@
           <div id="admin-tab-ai" style="display:none">
             <div class="card mb-16">
               <div class="section-title mb-4">Claude API 연동 (Anthropic)</div>
-              <div class="text-sm text-gray mb-16">API 키를 설정하면 이력서 분석과 면접 질문 생성에 AI를 활용합니다.</div>
-              <div class="form-group mb-12">
-                <label class="form-label">API Key</label>
-                <div class="flex gap-8">
-                  <input id="ai-api-key-input" class="form-control" type="password" placeholder="sk-ant-..."
-                    style="font-family:monospace;flex:1" />
-                  <button class="btn btn-secondary" onclick="toggleApiKeyVisibility()">🚨</button>
-                </div>
-                <span class="form-hint">키는 브라우저 로컬스토리지에만 저장됩니다. 외부 서버로 전송되지 않습니다.</span>
-              </div>
+              <div class="text-sm text-gray mb-16">API 키는 서버 환경변수로만 관리되며 브라우저에는 전달되지 않습니다. 키가 설정되어 있으면 이력서 분석과 면접 질문 생성에 AI를 활용합니다.</div>
               <div class="form-group mb-16">
                 <label class="form-label">사용 모델</label>
-                <select id="ai-model-select" class="form-control" style="width:320px">
+                <select id="ai-model-select" class="form-control" style="width:320px" onchange="saveAiModel()">
                   <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (권장 · 기본)</option>
                   <option value="claude-opus-4-8">Claude Opus 4.8 (고품질 · 심층 분석)</option>
                   <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (경량 · 빠름)</option>
                 </select>
-                </select>
               </div>
               <div class="flex gap-8 items-center">
-                <button class="btn btn-primary" onclick="saveApiKey()">저장</button>
                 <button class="btn btn-secondary" onclick="testApiKey()">연결 테스트</button>
-                <button class="btn btn-danger" onclick="clearApiKey()">키 삭제</button>
                 <span id="ai-key-status" class="text-sm"></span>
               </div>
             </div>
@@ -1441,6 +1430,40 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-confirm')">취소</button>
         <button class="btn btn-danger" id="confirm-ok-btn">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-assignments" onclick="closeModalOut(event,'modal-assignments')">
+    <div class="modal modal-lg">
+      <div class="modal-title" id="assignment-modal-title">과제 관리</div>
+
+      <div id="assignment-list" class="mb-16"></div>
+
+      <button class="btn btn-secondary btn-sm mb-12" onclick="openAssignmentForm(null)">+ 새 과제 등록</button>
+
+      <div id="assignment-form" style="display:none;border-top:1px solid #eee;padding-top:12px">
+        <div class="form-group mb-12">
+          <label class="form-label">과제 제목 <span class="required">*</span></label>
+          <input id="assignment-title" class="form-control" placeholder="예: 1차 코딩 과제" />
+        </div>
+        <div class="form-group mb-12">
+          <label class="form-label">과제 내용</label>
+          <textarea id="assignment-content" class="form-control" rows="6" placeholder="과제 설명/문제 내용을 입력하세요"></textarea>
+        </div>
+        <div class="form-group mb-12">
+          <label class="form-label">첨부파일 (선택)</label>
+          <input id="assignment-file-input" type="file" class="form-control" onchange="handleAssignmentFileUpload(this)" />
+          <div id="assignment-file-info" class="form-hint"></div>
+        </div>
+        <div class="flex gap-8" style="justify-content:flex-end">
+          <button class="btn btn-secondary" onclick="closeAssignmentForm()">취소</button>
+          <button class="btn btn-primary" onclick="saveAssignment()">저장</button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-assignments')">닫기</button>
       </div>
     </div>
   </div>

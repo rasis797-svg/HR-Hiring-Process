@@ -231,7 +231,6 @@
         wm_sheets: localStorage.getItem('wm_sheets') || '[]',
         wm_matching: localStorage.getItem('wm_matching') || '[]',
         wm_audit: localStorage.getItem('wm_audit') || '[]',
-        wm_api_key: localStorage.getItem('wm_api_key') || '',
         wm_ai_model: localStorage.getItem('wm_ai_model') || '',
       };
       const json = JSON.stringify(payload, null, 2);
@@ -267,11 +266,9 @@
           if (payload.wm_sheets) localStorage.setItem('wm_sheets', payload.wm_sheets);
           if (payload.wm_matching) localStorage.setItem('wm_matching', payload.wm_matching);
           if (payload.wm_audit) localStorage.setItem('wm_audit', payload.wm_audit);
-          if (payload.wm_api_key) localStorage.setItem('wm_api_key', payload.wm_api_key);
           if (payload.wm_ai_model) localStorage.setItem('wm_ai_model', payload.wm_ai_model);
           // 메모리 재로드
           loadData();
-          apiKey = localStorage.getItem('wm_api_key') || '';
           aiModel = localStorage.getItem('wm_ai_model') || 'claude-sonnet-4-6';
           renderSheets(); renderMatching(); renderPositions(); renderDashboard(); renderReports(); renderAuditLog(); syncPositionDropdowns();
           const sheets = JSON.parse(payload.wm_sheets || '[]').length;
@@ -1047,13 +1044,22 @@
     //  Claude API 연동 (Anthropic) 관리
     // ══════════════════════════════════════════════════
 
-    let apiKey = localStorage.getItem('wm_api_key') || '';
     let aiModel = localStorage.getItem('wm_ai_model') || 'claude-sonnet-4-6';
+    let aiAvailable = false; // 서버에 Claude API 키가 설정되어 있는지 여부 (키 자체는 클라이언트에 절대 전달되지 않음)
+
+    async function checkAiStatus() {
+      try {
+        const res = await fetch('/api/ai-status');
+        const data = await res.json();
+        aiAvailable = !!data.available;
+      } catch (e) {
+        aiAvailable = false;
+      }
+      updateAiStatus();
+    }
 
     function loadApiKeyUI() {
-      const inp = document.getElementById('ai-api-key-input');
       const sel = document.getElementById('ai-model-select');
-      if (inp) inp.value = apiKey;
       if (sel) sel.value = aiModel;
       updateAiStatus();
     }
@@ -1061,39 +1067,22 @@
     function updateAiStatus() {
       const el = document.getElementById('ai-key-status');
       if (!el) return;
-      if (apiKey) {
-        el.innerHTML = '<span class="badge badge-green">🚨 API 키 설정됨 · AI 분석 활성</span>';
+      if (aiAvailable) {
+        el.innerHTML = '<span class="badge badge-green">🚨 서버 API 키 연결됨 · AI 분석 활성</span>';
       } else {
-        el.innerHTML = '<span class="badge badge-gray">⚪ 미설정 · 키워드 분석 모드</span>';
+        el.innerHTML = '<span class="badge badge-gray">⚪ 서버에 API 키 미설정 · 키워드 분석 모드</span>';
       }
     }
 
-    function toggleApiKeyVisibility() {
-      const inp = document.getElementById('ai-api-key-input');
-      inp.type = inp.type === 'password' ? 'text' : 'password';
-    }
-
-    function saveApiKey() {
-      const inp = document.getElementById('ai-api-key-input');
+    function saveAiModel() {
       const sel = document.getElementById('ai-model-select');
-      apiKey = inp.value.trim();
       aiModel = sel.value;
-      localStorage.setItem('wm_api_key', apiKey);
       localStorage.setItem('wm_ai_model', aiModel);
-      updateAiStatus();
-      showToast('API 설정이 저장되었습니다.', 'success');
-    }
-
-    function clearApiKey() {
-      apiKey = '';
-      localStorage.removeItem('wm_api_key');
-      document.getElementById('ai-api-key-input').value = '';
-      updateAiStatus();
-      showToast('API 키가 삭제되었습니다.', 'info');
+      showToast('AI 모델 설정이 저장되었습니다.', 'success');
     }
 
     async function testApiKey() {
-      if (!apiKey) { showToast('API 키를 먼저 입력하세요.', 'error'); return; }
+      if (!aiAvailable) { showToast('서버에 Claude API 키가 설정되어 있지 않습니다.', 'error'); return; }
       showToast('연결 테스트 중...', 'info');
       try {
         const res = await callClaudeAPI('안녕하세요. 연결 테스트입니다. "OK"라고만 답하세요. 응답은 {"status": "OK"} 형태의 JSON으로 주세요.', 50);
@@ -1129,7 +1118,6 @@
               method: 'POST',
 
               headers: {
-                'x-api-key': apiKey,
                 'content-type': 'application/json'
               },
 
@@ -1280,7 +1268,7 @@ interview_questions.role_based는 6~10개, career_issues는 경력 이슈가 없
       if (m.analysis) {
         // 캐시 사용
         analysis = m.analysis;
-      } else if (apiKey && sheet && hasText) {
+      } else if (aiAvailable && sheet && hasText) {
         // AI 분석
         try {
           showToast('Claude AI로 분석 중입니다...', 'info');
@@ -1449,7 +1437,7 @@ interview_questions.role_based는 6~10개, career_issues는 경력 이슈가 없
       }
 
       // AI로 질문 생성
-      if (apiKey && sheet && m.extractedText?.length > 20) {
+      if (aiAvailable && sheet && m.extractedText?.length > 20) {
         document.getElementById('rd-generating').style.display = '';
         try {
           // analyzeWithAI가 이미 실행됐으면 결과 재사용, 아니면 재호출
@@ -1534,7 +1522,7 @@ interview_questions.role_based는 6~10개, career_issues는 경력 이슈가 없
     function renderReportBody(m, questions, sheet) {
       const roleQs = questions?.role_based || [];
       const careerQs = questions?.career_issues || [];
-      const aiLabel = m.reportData?.fromAI !== false && apiKey
+      const aiLabel = m.reportData?.fromAI !== false && aiAvailable
         ? '<span class="badge badge-blue">🤖 AI 생성</span>'
         : '<span class="badge badge-gray">키워드 기반 생성</span>';
 
@@ -1627,9 +1615,9 @@ interview_questions.role_based는 6~10개, career_issues는 경력 이슈가 없
       const hasResume = m.extractedText && m.extractedText.length > 50;
       const genBtn = `
     <div class="flex items-center gap-12 mb-16">
-      ${apiKey && hasResume
+      ${aiAvailable && hasResume
           ? `<button class="btn btn-primary" onclick="generateResumeQuestions()">🚨 이력서 기반 AI 질문 생성</button>`
-          : `<button class="btn btn-secondary" disabled title="${!apiKey ? 'API 키 미설정' : !hasResume ? '이력서 텍스트 없음' : ''}">🚨 AI 질문 생성 (${!apiKey ? 'API 키 필요' : '이력서 없음'})</button>`}
+          : `<button class="btn btn-secondary" disabled title="${!aiAvailable ? '서버 API 키 미설정' : !hasResume ? '이력서 텍스트 없음' : ''}">🚨 AI 질문 생성 (${!aiAvailable ? 'API 키 필요' : '이력서 없음'})</button>`}
       ${resumeQs.length ? '<span class="text-gray text-sm">재생성하면 기존 질문이 교체됩니다.</span>' : ''}
     </div>`;
 
@@ -2406,7 +2394,7 @@ ${m.extractedText.substring(0, 3000)}
 
       const tbody = document.getElementById('positions-tbody');
       if (sheetsData.length === 0) {
-        tbody.innerHTML = '<tr id="positions-empty"><td colspan="7"><div class="empty-state"><div class="empty-icon">💼</div><div class="empty-text">등록된 포지션이 없습니다. 설계시트를 생성하면 자동으로 포지션이 등록됩니다.</div></div></td></tr>';
+        tbody.innerHTML = '<tr id="positions-empty"><td colspan="8"><div class="empty-state"><div class="empty-icon">💼</div><div class="empty-text">등록된 포지션이 없습니다. 설계시트를 생성하면 자동으로 포지션이 등록됩니다.</div></div></td></tr>';
         return;
       }
 
@@ -2424,7 +2412,7 @@ ${m.extractedText.substring(0, 3000)}
       });
 
       if (rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">조건에 맞는 포지션이 없습니다.</div></div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">조건에 맞는 포지션이 없습니다.</div></div></td></tr>';
         return;
       }
 
@@ -2447,12 +2435,208 @@ ${m.extractedText.substring(0, 3000)}
         <button class="btn btn-secondary btn-sm" style="margin-left:6px;font-size:11px;padding:2px 8px" onclick="setPositionStatus(${i},'${nextVal}')">${nextStatus}</button>
       </td>
       <td class="text-gray text-sm">${s.created}</td>
+      <td>
+        <input class="form-control form-control-sm" style="font-size:12px;padding:4px 6px;width:120px" value="${escHtml(s.storageLocation || '')}" placeholder="예: 인사팀 서버 3층" onchange="updatePositionStorage(${i}, this.value)" />
+      </td>
       <td class="flex gap-8">
         <button class="btn btn-secondary btn-sm" onclick="openSheetDetail(${i})">설계시트</button>
+        <button class="btn btn-secondary btn-sm" onclick="openAssignments(${i})">과제</button>
         <button class="btn btn-secondary btn-sm" onclick="nav('matching')">분석 보기</button>
       </td>
     </tr>`;
       }).join('');
+    }
+
+    function updatePositionStorage(idx, value) {
+      const s = sheetsData[idx];
+      if (!s) return;
+      s.storageLocation = value.trim();
+      saveData();
+    }
+
+    // ── 포지션별 과제(Assignment) 관리 ──
+    let currentAssignmentPosIdx = null;
+    let currentAssignmentEditId = null;
+    let pendingAssignmentFile = null; // { name, type, dataUrl }
+
+    function openAssignments(idx) {
+      currentAssignmentPosIdx = idx;
+      const s = sheetsData[idx];
+      if (!s) return;
+      if (!s.assignments) s.assignments = [];
+      document.getElementById('assignment-modal-title').textContent = `${s.name} · 과제 관리`;
+      closeAssignmentForm();
+      renderAssignmentList();
+      openModal('modal-assignments');
+    }
+
+    function renderAssignmentList() {
+      const s = sheetsData[currentAssignmentPosIdx];
+      const wrap = document.getElementById('assignment-list');
+      if (!s || !s.assignments || s.assignments.length === 0) {
+        wrap.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">등록된 과제가 없습니다.</div></div>';
+        return;
+      }
+      wrap.innerHTML = s.assignments.map(a => `
+        <div class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid #eee">
+          <div>
+            <div><strong>${escHtml(a.title)}</strong></div>
+            <div class="text-gray text-sm">${a.fileName ? '첨부파일: ' + escHtml(a.fileName) : '첨부파일 없음'} · 수정일 ${a.modified}</div>
+          </div>
+          <div class="flex gap-8">
+            <button class="btn btn-secondary btn-sm" onclick="openAssignmentForm('${a.id}')">불러오기/수정</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportAssignment('${a.id}')">내보내기</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteAssignment('${a.id}')">삭제</button>
+          </div>
+        </div>`).join('');
+    }
+
+    function openAssignmentForm(editId) {
+      currentAssignmentEditId = editId || null;
+      pendingAssignmentFile = null;
+      document.getElementById('assignment-form').style.display = '';
+      document.getElementById('assignment-file-info').textContent = '';
+      const titleEl = document.getElementById('assignment-title');
+      const contentEl = document.getElementById('assignment-content');
+      if (editId) {
+        const s = sheetsData[currentAssignmentPosIdx];
+        const a = (s.assignments || []).find(x => x.id === editId);
+        if (a) {
+          titleEl.value = a.title;
+          contentEl.value = a.content || '';
+          if (a.fileName) {
+            document.getElementById('assignment-file-info').textContent = `현재 첨부파일: ${a.fileName}`;
+            pendingAssignmentFile = { name: a.fileName, type: a.fileType, dataUrl: a.fileData };
+          }
+        }
+      } else {
+        titleEl.value = '';
+        contentEl.value = '';
+      }
+      document.getElementById('assignment-file-input').value = '';
+    }
+
+    function closeAssignmentForm() {
+      currentAssignmentEditId = null;
+      pendingAssignmentFile = null;
+      const form = document.getElementById('assignment-form');
+      if (form) form.style.display = 'none';
+    }
+
+    function handleAssignmentFileUpload(input) {
+      if (!input.files.length) return;
+      const file = input.files[0];
+      if (file.size > 20 * 1024 * 1024) {
+        showToast('파일 크기는 20MB 이하만 가능합니다.', 'error');
+        return;
+      }
+      const infoEl = document.getElementById('assignment-file-info');
+      infoEl.textContent = `"${file.name}" 불러오는 중...`;
+      const reader = new FileReader();
+      reader.onload = e => {
+        pendingAssignmentFile = { name: file.name, type: file.type, dataUrl: e.target.result };
+        infoEl.textContent = `첨부됨: ${file.name}`;
+      };
+      reader.readAsDataURL(file);
+
+      // .docx 파일은 텍스트도 함께 추출하여 본문에 불러오기
+      if (file.name.toLowerCase().endsWith('.docx') && typeof mammoth !== 'undefined') {
+        const textReader = new FileReader();
+        textReader.onload = e2 => {
+          mammoth.extractRawText({ arrayBuffer: e2.target.result })
+            .then(r => {
+              const contentEl = document.getElementById('assignment-content');
+              if (r.value && !contentEl.value.trim()) contentEl.value = r.value.trim();
+            })
+            .catch(() => {});
+        };
+        textReader.readAsArrayBuffer(file);
+      } else if (file.name.toLowerCase().endsWith('.txt')) {
+        const textReader = new FileReader();
+        textReader.onload = e2 => {
+          const contentEl = document.getElementById('assignment-content');
+          if (!contentEl.value.trim()) contentEl.value = (e2.target.result || '').trim();
+        };
+        textReader.readAsText(file, 'UTF-8');
+      }
+    }
+
+    function saveAssignment() {
+      const s = sheetsData[currentAssignmentPosIdx];
+      if (!s) return;
+      const title = document.getElementById('assignment-title').value.trim();
+      const content = document.getElementById('assignment-content').value.trim();
+      if (!title) { showToast('과제 제목을 입력하세요.', 'error'); return; }
+
+      const now = new Date();
+      const today = now.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace('.', '');
+
+      if (!s.assignments) s.assignments = [];
+
+      if (currentAssignmentEditId) {
+        const a = s.assignments.find(x => x.id === currentAssignmentEditId);
+        if (a) {
+          a.title = title;
+          a.content = content;
+          a.modified = today;
+          if (pendingAssignmentFile) {
+            a.fileName = pendingAssignmentFile.name;
+            a.fileType = pendingAssignmentFile.type;
+            a.fileData = pendingAssignmentFile.dataUrl;
+          }
+        }
+      } else {
+        s.assignments.push({
+          id: 'as_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          title, content,
+          fileName: pendingAssignmentFile ? pendingAssignmentFile.name : '',
+          fileType: pendingAssignmentFile ? pendingAssignmentFile.type : '',
+          fileData: pendingAssignmentFile ? pendingAssignmentFile.dataUrl : '',
+          created: today, modified: today
+        });
+      }
+      saveData();
+      closeAssignmentForm();
+      renderAssignmentList();
+      addAuditLog('우성 관리자', '과제 등록/수정', `${s.name} · ${title}`);
+      showToast('과제가 저장되었습니다.', 'success');
+    }
+
+    function deleteAssignment(id) {
+      const s = sheetsData[currentAssignmentPosIdx];
+      if (!s || !s.assignments) return;
+      showConfirm('과제 삭제', '이 과제를 삭제하시겠습니까?', () => {
+        s.assignments = s.assignments.filter(a => a.id !== id);
+        saveData();
+        renderAssignmentList();
+        showToast('과제가 삭제되었습니다.', 'success');
+      });
+    }
+
+    function exportAssignment(id) {
+      const s = sheetsData[currentAssignmentPosIdx];
+      const a = s && (s.assignments || []).find(x => x.id === id);
+      if (!a) return;
+
+      if (a.fileData) {
+        const link = document.createElement('a');
+        link.href = a.fileData;
+        link.download = a.fileName || `${a.title}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } else {
+        const blob = new Blob([`${a.title}\n\n${a.content || ''}`], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${a.title}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+      showToast('과제를 다운로드했습니다.', 'success');
     }
 
     async function addUser() {
@@ -3286,7 +3470,7 @@ ${m.extractedText.substring(0, 3000)}
       const f1 = document.getElementById('new-f1').value.trim();
       if (!posName) { showToast('포지션명을 먼저 입력하세요.', 'error'); return; }
       if (!f1) { showToast('① 역량 레벨을 먼저 입력하세요.', 'error'); return; }
-      if (!apiKey) { showToast('AI 자동 생성에는 API 키가 필요합니다. 설정 > AI 설정에서 입력하세요.', 'error'); return; }
+      if (!aiAvailable) { showToast('AI 자동 생성을 사용하려면 서버에 Claude API 키가 설정되어 있어야 합니다. 관리자에게 문의하세요.', 'error'); return; }
 
       const btn = document.getElementById('btn-ai-gen-sheet');
       if (btn) { btn.disabled = true; btn.textContent = '생성 중...'; }
@@ -4705,6 +4889,7 @@ ${m.extractedText.substring(0, 3000)}
     // ── Init ──
     document.addEventListener('DOMContentLoaded', () => {
       initSupabase();
+      checkAiStatus();
 
       loadData();
       loadScheduleData();
