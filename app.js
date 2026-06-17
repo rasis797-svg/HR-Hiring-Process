@@ -2123,6 +2123,7 @@ ${m.extractedText.substring(0, 3000)}
     <td><span class="badge ${statusClass}">${escHtml(u.status)}</span></td>
     <td class="text-gray text-sm">${escHtml(u.lastLogin || '—')}</td>
     <td class="flex gap-8">
+      ${u.status === '초대됨' ? `<button class="btn btn-secondary btn-sm" onclick="resendInvite('${u.id}')">초대 재전송</button>` : ''}
       <button class="btn btn-secondary btn-sm" onclick="openModal('modal-user-perms')">권한 설정</button>
       <button class="btn btn-danger btn-sm" onclick="deactivateUser('${u.id}')">비활성화</button>
     </td>`;
@@ -2135,6 +2136,27 @@ ${m.extractedText.substring(0, 3000)}
       saveData();
       renderUsers();
       showToast('계정이 비활성화되었습니다.', 'success');
+    }
+
+    async function resendInvite(id) {
+      const u = usersData.find(x => x.id === id);
+      if (!u) return;
+      try {
+        const res = await fetch('/api/invite-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: u.name, email: u.email, role: u.role }),
+        });
+        const result = await res.json();
+        if (!res.ok) {
+          showToast(`초대 재전송 실패: ${result.error?.message || '알 수 없는 오류'}`, 'error');
+          return;
+        }
+        addAuditLog('우성 관리자', '초대 재전송', u.email);
+        showToast(`${u.name}(${u.email})에게 초대 메일을 재전송했습니다.`, 'success');
+      } catch (e) {
+        showToast(`초대 재전송 실패: ${e.message}`, 'error');
+      }
     }
 
     function addAuditLog(user, action, target) {
