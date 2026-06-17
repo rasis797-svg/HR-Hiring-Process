@@ -1,5 +1,6 @@
     // ── State ──
     let currentPage = '';
+    let currentUserRole = '';
 
     // ── Navigation ──
     function nav(page) {
@@ -95,8 +96,18 @@
       document.getElementById('account-email').value = user.email;
       const now = new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
       document.getElementById('admin-last-login').textContent = now;
+      currentUserRole = user.role || '';
+      updateAdminTabVisibility();
       addAuditLog(user.name, '로그인', '—');
       nav('dashboard');
+    }
+
+    function updateAdminTabVisibility() {
+      const aiTab = document.getElementById('atab-ai');
+      if (!aiTab) return;
+      const allowed = currentUserRole === '시스템 관리자';
+      aiTab.style.display = allowed ? '' : 'none';
+      if (!allowed && aiTab.classList.contains('active')) switchAdminTab('users');
     }
 
     function doLogout() {
@@ -2238,6 +2249,7 @@ ${m.extractedText.substring(0, 3000)}
     <td class="flex gap-8">
       ${u.status === '초대됨' ? `<button class="btn btn-secondary btn-sm" onclick="resendInvite('${u.id}')">초대 재전송</button>` : ''}
       ${u.status === '활성' ? `<button class="btn btn-secondary btn-sm" onclick="resendLoginEmail('${u.id}')">로그인 메일 재전송</button>` : ''}
+      <button class="btn btn-secondary btn-sm" onclick="openUserPerms('${u.id}')">권한 설정</button>
       ${u.status === '비활성'
         ? `<button class="btn btn-secondary btn-sm" onclick="reactivateUser('${u.id}')">활성화</button>`
         : `<button class="btn btn-secondary btn-sm" onclick="deactivateUser('${u.id}')">비활성화</button>`}
@@ -2503,10 +2515,33 @@ ${m.extractedText.substring(0, 3000)}
       }
     }
 
+    const DEFAULT_PERMS = { sheet_edit: true, sheet_delete: false, resume_analyze: true, match_view: true, report_view: true, user_manage: false };
+    let currentPermUserId = null;
+
+    function openUserPerms(id) {
+      const u = usersData.find(x => x.id === id);
+      if (!u) return;
+      currentPermUserId = id;
+      document.getElementById('perm-modal-title').textContent = `권한 설정 — ${u.name}`;
+      const perms = Object.assign({}, DEFAULT_PERMS, u.permissions || {});
+      document.querySelectorAll('#modal-user-perms input[data-perm]').forEach(cb => {
+        cb.checked = !!perms[cb.dataset.perm];
+      });
+      openModal('modal-user-perms');
+    }
+
     function savePerms() {
+      const u = usersData.find(x => x.id === currentPermUserId);
+      if (!u) { closeModal('modal-user-perms'); return; }
+      const perms = {};
+      document.querySelectorAll('#modal-user-perms input[data-perm]').forEach(cb => {
+        perms[cb.dataset.perm] = cb.checked;
+      });
+      u.permissions = perms;
+      saveData();
       closeModal('modal-user-perms');
-      addAuditLog('우성 관리자', '권한 변경', '사용자 권한');
-      showToast('권한이 저장되었습니다.', 'success');
+      addAuditLog('우성 관리자', '권한 변경', u.email);
+      showToast(`${u.name}님의 권한이 저장되었습니다.`, 'success');
     }
 
     function confirmDeactivate() {

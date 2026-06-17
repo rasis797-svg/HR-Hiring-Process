@@ -1400,35 +1400,31 @@
 
   <div class="modal-overlay" id="modal-user-perms" onclick="closeModalOut(event,'modal-user-perms')">
     <div class="modal modal-lg">
-      <div class="modal-title">권한 설정 — 이팀장</div>
+      <div class="modal-title" id="perm-modal-title">권한 설정</div>
       <div class="flex flex-col gap-10">
         <div class="flex items-center justify-between">
           <span>설계시트 생성/수정</span>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" checked />
-            허용</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-perm="sheet_edit" /> 허용</label>
         </div>
         <div class="flex items-center justify-between">
           <span>설계시트 삭제</span>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" /> 허용</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-perm="sheet_delete" /> 허용</label>
         </div>
         <div class="flex items-center justify-between">
           <span>이력서 업로드/분석</span>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" checked />
-            허용</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-perm="resume_analyze" /> 허용</label>
         </div>
         <div class="flex items-center justify-between">
           <span>매칭 결과 조회</span>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" checked />
-            허용</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-perm="match_view" /> 허용</label>
         </div>
         <div class="flex items-center justify-between">
           <span>면접 리포트 생성/조회</span>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" checked />
-            허용</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-perm="report_view" /> 허용</label>
         </div>
         <div class="flex items-center justify-between">
           <span>사용자 관리</span>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" /> 허용</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-perm="user_manage" /> 허용</label>
         </div>
       </div>
       <div class="modal-footer">
