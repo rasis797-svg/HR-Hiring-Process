@@ -2217,7 +2217,7 @@ ${m.extractedText.substring(0, 3000)}
       }).join('');
     }
 
-    function addUser() {
+    async function addUser() {
       const modal = document.getElementById('modal-add-user');
       const inputs = modal.querySelectorAll('input');
       const select = modal.querySelector('select');
@@ -2225,25 +2225,44 @@ ${m.extractedText.substring(0, 3000)}
       const email = inputs[1].value.trim();
       const role = select.value;
       if (!name || !email) { showToast('이름과 이메일을 입력하세요.', 'error'); return; }
-      const today = new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-      const roleClass = role.includes('HR') ? 'badge-blue' : role.includes('채용') ? 'badge-orange' : 'badge-gray';
-      const tbody = document.getElementById('users-tbody');
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
+
+      const submitBtn = modal.querySelector('.btn-primary');
+      if (submitBtn) submitBtn.disabled = true;
+      try {
+        const res = await fetch('/api/invite-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, role }),
+        });
+        const result = await res.json();
+        if (!res.ok) {
+          showToast(`초대 메일 발송 실패: ${result.error?.message || '알 수 없는 오류'}`, 'error');
+          return;
+        }
+
+        const roleClass = role.includes('HR') ? 'badge-blue' : role.includes('채용') ? 'badge-orange' : 'badge-gray';
+        const tbody = document.getElementById('users-tbody');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
     <td><strong>${name}</strong></td>
     <td class="text-gray">${email}</td>
     <td><span class="badge ${roleClass}">${role}</span></td>
-    <td><span class="badge badge-green">활성</span></td>
+    <td><span class="badge badge-green">초대됨</span></td>
     <td class="text-gray text-sm">—</td>
     <td class="flex gap-8">
       <button class="btn btn-secondary btn-sm" onclick="openModal('modal-user-perms')">권한 설정</button>
       <button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();showToast('계정이 비활성화되었습니다.','success')">비활성화</button>
     </td>`;
-      tbody.appendChild(tr);
-      inputs.forEach(i => i.value = '');
-      closeModal('modal-add-user');
-      addAuditLog('우성 관리자', '사용자 등록', email);
-      showToast(`${name}(${email}) 계정이 등록되었습니다. 임시 비밀번호가 발송됩니다.`, 'success');
+        tbody.appendChild(tr);
+        inputs.forEach(i => i.value = '');
+        closeModal('modal-add-user');
+        addAuditLog('우성 관리자', '사용자 등록', email);
+        showToast(`${name}(${email})에게 초대 메일이 발송되었습니다.`, 'success');
+      } catch (e) {
+        showToast(`초대 메일 발송 실패: ${e.message}`, 'error');
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
     }
 
     function savePerms() {
