@@ -2323,6 +2323,24 @@ ${m.extractedText.substring(0, 3000)}
       const role = select.value;
       if (!name || !email) { showToast('이름과 이메일을 입력하세요.', 'error'); return; }
 
+      const existing = usersData.find(u => u.email.toLowerCase() === email.toLowerCase());
+      if (existing) {
+        if (existing.status === '비활성') {
+          existing.status = '활성';
+          existing.name = name;
+          existing.role = role;
+          saveData();
+          renderUsers();
+          inputs.forEach(i => i.value = '');
+          closeModal('modal-add-user');
+          addAuditLog('우성 관리자', '계정 재활성화', email);
+          showToast(`${name}(${email}) 계정을 다시 활성화했습니다.`, 'success');
+        } else {
+          showToast(`${email}은 이미 등록된 계정입니다. 사용자 관리 목록에서 확인하세요.`, 'error');
+        }
+        return;
+      }
+
       const submitBtn = modal.querySelector('.btn-primary');
       if (submitBtn) submitBtn.disabled = true;
       try {
@@ -2333,7 +2351,12 @@ ${m.extractedText.substring(0, 3000)}
         });
         const result = await res.json();
         if (!res.ok) {
-          showToast(`초대 메일 발송 실패: ${result.error?.message || '알 수 없는 오류'}`, 'error');
+          const msg = result.error?.message || '알 수 없는 오류';
+          if (/already.*registered/i.test(msg)) {
+            showToast(`${email}은 이미 가입된 이메일입니다.`, 'error');
+          } else {
+            showToast(`초대 메일 발송 실패: ${msg}`, 'error');
+          }
           return;
         }
 
