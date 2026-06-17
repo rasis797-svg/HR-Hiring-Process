@@ -221,18 +221,37 @@
       if (t === 'ai') loadApiKeyUI();
       if (t === 'gs') loadGsheetsConfigUI();
       if (t === 'ivset') renderInterviewSettingsUI();
+      if (t === 'data') renderBackupHistoryUI();
     }
 
-    // ── 데이터 내보내기 ──
+    // ── 백업 대상 localStorage 키 전체 ──
+    const BACKUP_KEYS = ['wm_sheets', 'wm_matching', 'wm_audit', 'wm_users', 'wm_schedule', 'wm_interviewers', 'wm_iv_appts', 'wm_iv_settings', 'wm_ci_results', 'wm_ai_model'];
+
+    function collectBackupPayload() {
+      const payload = { version: 2, exportedAt: new Date().toISOString() };
+      BACKUP_KEYS.forEach(k => { payload[k] = localStorage.getItem(k) || (k === 'wm_iv_settings' ? '{}' : k === 'wm_ai_model' ? '' : '[]'); });
+      return payload;
+    }
+
+    function applyBackupPayload(payload) {
+      BACKUP_KEYS.forEach(k => { if (payload[k] !== undefined) localStorage.setItem(k, payload[k]); });
+      loadData();
+      loadScheduleData();
+      loadInterviewSettings();
+      loadInterviewAppointments();
+      aiModel = localStorage.getItem('wm_ai_model') || 'claude-sonnet-4-6';
+      renderDashboard(); renderSheets(); renderMatching(); renderPositions();
+      renderReports(); renderAuditLog(); renderUsers(); syncPositionDropdowns();
+    }
+
+    function backupCounts(payload) {
+      const safeLen = (k, fallback) => { try { return JSON.parse(payload[k] || fallback).length; } catch (e) { return 0; } };
+      return { sheets: safeLen('wm_sheets', '[]'), matches: safeLen('wm_matching', '[]'), users: safeLen('wm_users', '[]') };
+    }
+
+    // ── 데이터 내보내기 (수동, 파일로 저장) ──
     function exportAllData() {
-      const payload = {
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        wm_sheets: localStorage.getItem('wm_sheets') || '[]',
-        wm_matching: localStorage.getItem('wm_matching') || '[]',
-        wm_audit: localStorage.getItem('wm_audit') || '[]',
-        wm_ai_model: localStorage.getItem('wm_ai_model') || '',
-      };
+      const payload = collectBackupPayload();
       const json = JSON.stringify(payload, null, 2);
       const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
       const a = document.createElement('a');
@@ -241,13 +260,12 @@
       a.download = `채용매칭_백업_${dateStr}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
-      const sheets = JSON.parse(payload.wm_sheets || '[]').length;
-      const matches = JSON.parse(payload.wm_matching || '[]').length;
-      document.getElementById('export-status').textContent = `완료 — 설계시트 ${sheets}개, 매칭 ${matches}건 내보냄`;
+      const c = backupCounts(payload);
+      document.getElementById('export-status').textContent = `완료 — 설계시트 ${c.sheets}개, 매칭 ${c.matches}건, 사용자 ${c.users}명 내보냄`;
       showToast('데이터가 JSON 파일로 저장되었습니다.', 'success');
     }
 
-    // ── 데이터 가져오기 ──
+    // ── 데이터 가져오기 (수동, 파일에서 복원) ──
     function importAllData(input) {
       if (!input.files.length) return;
       const file = input.files[0];
@@ -263,27 +281,114 @@
             input.value = '';
             return;
           }
-          if (payload.wm_sheets) localStorage.setItem('wm_sheets', payload.wm_sheets);
-          if (payload.wm_matching) localStorage.setItem('wm_matching', payload.wm_matching);
-          if (payload.wm_audit) localStorage.setItem('wm_audit', payload.wm_audit);
-          if (payload.wm_ai_model) localStorage.setItem('wm_ai_model', payload.wm_ai_model);
-          // 메모리 재로드
-          loadData();
-          aiModel = localStorage.getItem('wm_ai_model') || 'claude-sonnet-4-6';
-          renderSheets(); renderMatching(); renderPositions(); renderDashboard(); renderReports(); renderAuditLog(); syncPositionDropdowns();
-          const sheets = JSON.parse(payload.wm_sheets || '[]').length;
-          const matches = JSON.parse(payload.wm_matching || '[]').length;
+          takeLocalBackup('가져오기 직전 자동 백업');
+          applyBackupPayload(payload);
+          const c = backupCounts(payload);
           const statusEl = document.getElementById('import-status');
           statusEl.style.display = '';
           statusEl.className = 'text-sm text-green';
-          statusEl.textContent = `✅ 가져오기 완료 — 설계시트 ${sheets}개, 매칭 ${matches}건 복원됨`;
+          statusEl.textContent = `✅ 가져오기 완료 — 설계시트 ${c.sheets}개, 매칭 ${c.matches}건, 사용자 ${c.users}명 복원됨`;
           input.value = '';
-          showToast(`데이터를 성공적으로 가져왔습니다. (설계시트 ${sheets}개, 매칭 ${matches}건)`, 'success');
+          showToast(`데이터를 성공적으로 가져왔습니다. (설계시트 ${c.sheets}개, 매칭 ${c.matches}건)`, 'success');
+          saveData();
         } catch (err) {
           showToast('파일 파싱 오류: ' + err.message, 'error');
         }
       };
       reader.readAsText(file, 'UTF-8');
+    }
+
+    // ══════════════════════════════════════════════════
+    //  로컬 자동 백업 (최근 N개 스냅샷을 브라우저에 보관)
+    // ══════════════════════════════════════════════════
+    const BACKUP_HISTORY_KEY = 'wm_backup_history';
+    const BACKUP_HISTORY_MAX = 15;
+    const BACKUP_MIN_INTERVAL_MS = 60 * 1000; // 같은 사유 없는 호출은 1분에 한 번만 스냅샷
+
+    function loadBackupHistory() {
+      try { return JSON.parse(localStorage.getItem(BACKUP_HISTORY_KEY) || '[]'); } catch (e) { return []; }
+    }
+
+    function takeLocalBackup(label) {
+      try {
+        const history = loadBackupHistory();
+        const isThrottled = !label && history[0] && (Date.now() - new Date(history[0].time).getTime()) < BACKUP_MIN_INTERVAL_MS;
+        if (isThrottled) return false;
+        const snapshot = { time: new Date().toISOString(), label: label || '자동 백업', data: collectBackupPayload() };
+        history.unshift(snapshot);
+        while (history.length > BACKUP_HISTORY_MAX) history.pop();
+        localStorage.setItem(BACKUP_HISTORY_KEY, JSON.stringify(history));
+        return true;
+      } catch (e) {
+        console.warn('로컬 백업 실패:', e);
+        return false;
+      }
+    }
+
+    function manualBackupNow() {
+      takeLocalBackup('수동 백업');
+      renderBackupHistoryUI();
+      showToast('현재 상태를 로컬 백업에 저장했습니다.', 'success');
+    }
+
+    function restoreLocalBackup(idx) {
+      const history = loadBackupHistory();
+      const snap = history[idx];
+      if (!snap) return;
+      const timeTx = new Date(snap.time).toLocaleString('ko-KR');
+      if (!confirm(`"${snap.label}" (${timeTx}) 백업으로 복원하시겠습니까?\n현재 데이터는 덮어씌워집니다.`)) return;
+      takeLocalBackup('복원 직전 자동 백업');
+      applyBackupPayload(snap.data);
+      renderBackupHistoryUI();
+      showToast('백업으로 복원되었습니다.', 'success');
+      saveData();
+    }
+
+    function downloadLocalBackup(idx) {
+      const history = loadBackupHistory();
+      const snap = history[idx];
+      if (!snap) return;
+      const json = JSON.stringify(snap.data, null, 2);
+      const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      const dateStr = new Date(snap.time).toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      a.download = `채용매칭_백업_${dateStr}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function deleteLocalBackup(idx) {
+      const history = loadBackupHistory();
+      if (!history[idx]) return;
+      history.splice(idx, 1);
+      localStorage.setItem(BACKUP_HISTORY_KEY, JSON.stringify(history));
+      renderBackupHistoryUI();
+    }
+
+    function renderBackupHistoryUI() {
+      const list = document.getElementById('backup-history-list');
+      if (!list) return;
+      const history = loadBackupHistory();
+      if (history.length === 0) {
+        list.innerHTML = '<div class="text-sm text-gray" style="padding:12px 0">저장된 자동 백업이 없습니다.</div>';
+        return;
+      }
+      list.innerHTML = history.map((snap, i) => {
+        const c = backupCounts(snap.data);
+        const timeTx = new Date(snap.time).toLocaleString('ko-KR');
+        return `<div class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid #f0f0f0">
+      <div>
+        <div style="font-size:13px;font-weight:600">${escHtml(snap.label)}</div>
+        <div class="text-sm text-gray">${timeTx} · 설계시트 ${c.sheets}개 · 매칭 ${c.matches}건 · 사용자 ${c.users}명</div>
+      </div>
+      <div class="flex gap-8">
+        <button class="btn btn-secondary btn-sm" onclick="downloadLocalBackup(${i})">⬇️ 다운로드</button>
+        <button class="btn btn-primary btn-sm" onclick="restoreLocalBackup(${i})">복원</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteLocalBackup(${i})">삭제</button>
+      </div>
+    </div>`;
+      }).join('');
     }
 
     // ── Sheet actions ──
@@ -2146,6 +2251,7 @@ ${m.extractedText.substring(0, 3000)}
     const SB_KEY = 'sb_publishable__WUC-nsBd0dX1KrQlGLc2g_D-f0R6fb';
     let sbClient = null;
     let sbReady = false;
+    let cloudSyncDone = false; // true only after the initial cloud→local pull finishes (success or no-op) — blocks premature pushes of empty local state
 
     function initSupabase() {
       if (typeof supabase === 'undefined') { console.warn('Supabase SDK 로드 안 됨'); return; }
@@ -2163,10 +2269,10 @@ ${m.extractedText.substring(0, 3000)}
     }
 
     async function loadFromSupabase() {
-      if (!sbReady) return;
+      if (!sbReady) { cloudSyncDone = true; return; }
       try {
         const { data, error } = await sbClient.from('app_data').select('key, value');
-        if (error) { console.warn('Supabase 로드 오류:', error); return; }
+        if (error) { console.warn('Supabase 로드 오류:', error); cloudSyncDone = true; return; }
         if (!data || data.length === 0) {
           // 첫 실행: 현재 localStorage 데이터를 Supabase로 업로드
           await sbSave('wm_sheets', sheetsData);
@@ -2178,10 +2284,14 @@ ${m.extractedText.substring(0, 3000)}
           await sbSave('wm_iv_appts', interviewAppointments);
           await sbSave('wm_iv_settings', interviewSettings);
           showToast('클라우드 초기 업로드 완료', 'success');
+          cloudSyncDone = true;
           return;
         }
         const map = {};
         data.forEach(row => { map[row.key] = row.value; });
+
+        // 클라우드 값으로 덮어쓰기 전, 현재 로컬 상태를 백업 (클라우드 데이터가 비정상적으로 비어있는 경우를 위한 안전장치)
+        takeLocalBackup('클라우드 동기화 전 자동 백업');
 
         if (map['wm_sheets'])       { sheetsData = map['wm_sheets'];             localStorage.setItem('wm_sheets', JSON.stringify(sheetsData)); }
         if (map['wm_matching'])     { matchingData = map['wm_matching'];          localStorage.setItem('wm_matching', JSON.stringify(matchingData)); }
@@ -2195,7 +2305,11 @@ ${m.extractedText.substring(0, 3000)}
         renderDashboard(); renderSheets(); renderMatching(); renderPositions();
         renderReports(); renderAuditLog(); renderUsers(); syncPositionDropdowns();
         showToast('클라우드 데이터 동기화 완료', 'success');
-      } catch (e) { console.warn('Supabase 로드 실패:', e); }
+      } catch (e) {
+        console.warn('Supabase 로드 실패:', e);
+      } finally {
+        cloudSyncDone = true;
+      }
     }
 
     function saveData() {
@@ -2203,6 +2317,8 @@ ${m.extractedText.substring(0, 3000)}
       localStorage.setItem('wm_matching', JSON.stringify(matchingData));
       localStorage.setItem('wm_audit', JSON.stringify(auditData));
       localStorage.setItem('wm_users', JSON.stringify(usersData));
+      takeLocalBackup();
+      if (!cloudSyncDone) return; // 초기 클라우드 동기화가 끝나기 전에는 클라우드에 쓰지 않음 (빈 데이터로 덮어쓰는 사고 방지)
       sbSave('wm_sheets', sheetsData);
       sbSave('wm_matching', matchingData);
       sbSave('wm_audit', auditData);
@@ -2912,6 +3028,14 @@ ${m.extractedText.substring(0, 3000)}
 
     const SKIP_REASONS = ['사전 답변 완료 (메인에서 이미 답변함)', '전제 조건 미달 (해당 경험 없음)', '이전 단계에서 Red Flag 확정', '시간 제약으로 인한 스킵', '기타 (직접 입력)'];
 
+    const STAR_LEVELS = [
+      { id: 1, label: '불합격', desc: 'Gold Flag 미흡, 직무 지식 충족 못함, Red Flag 발견.' },
+      { id: 2, label: '잠재적 스타플레이어', desc: '동 레벨 스타플레이어와 비교 시 기술/지식적으로 부족하지만, 스타플레이어가 될 수 있는 명백한 증거가 발견된 경우(예: 산업 지식이 부족해서 발생한 문제지만, 시스템적 사고능력은 스타플레이어 급)' },
+      { id: 3, label: '현 스타플레이어와 동급', desc: '동 레벨 스타플레이어와 비교 시 기술 및 지식면에서 동급이라고 판단한 경우' },
+      { id: 4, label: '현 스타플레이어 이상', desc: '동 레벨 스타플레이어와 비교 시 더 나은 지식과 기술, 사고 방식을 보유했다고 판단한 경우' },
+      { id: 5, label: '5-Star 게임 체인저', desc: '동 레벨이 아닌 상위 레벨의 스타플레이어와 비교하여도 부족하지 않은 지식과 기술을 보유한다고 판단한 경우' },
+    ];
+
     let ci = null; // current interview session
 
     function ciNav() { nav('core-interview'); renderCI(); }
@@ -3404,7 +3528,44 @@ ${m.extractedText.substring(0, 3000)}
     <div class="section-title mb-12">종합 의견</div>
     <textarea id="ci-opinion" class="form-control" rows="5" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(ci.opinion || '')}</textarea>
     <div class="text-sm text-gray" style="margin-top:6px">※ "💾 결과 저장" 시 함께 저장됩니다.</div>
+  </div>
+  ${renderCIStarSection(ci.starLevel, ci.starMemo)}`;
+    }
+
+    // ── 5단계 최종 등급 평가 + 메모 (결과 화면 하단 고정) ──
+    function renderCIStarSection(selectedLevel, memo) {
+      const boxes = STAR_LEVELS.map(lv => `
+    <div class="ci-star-box${selectedLevel === lv.id ? ' active' : ''}" onclick="ciSetStarLevel(${lv.id})" style="border:2px solid ${selectedLevel === lv.id ? '#333' : '#e0e0e0'};border-radius:8px;padding:12px 14px;cursor:pointer;background:${selectedLevel === lv.id ? '#f5f5f5' : '#fff'};margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span class="badge ${selectedLevel === lv.id ? 'badge-gray' : 'badge-gray'}" style="font-size:11px">(${lv.id})</span>
+        <span style="font-weight:700;font-size:13px">${escHtml(lv.label)}</span>
+        ${selectedLevel === lv.id ? '<span style="margin-left:auto;font-size:12px;color:#2a9a50;font-weight:700">✓ 선택됨</span>' : ''}
+      </div>
+      <div style="font-size:12px;color:#666;line-height:1.5">${escHtml(lv.desc)}</div>
+    </div>`).join('');
+
+      return `
+  <div class="card" style="margin-top:16px">
+    <div class="section-title mb-4">최종 등급 평가 (5단계 척도)</div>
+    <div class="text-sm text-gray mb-16">동 레벨 스타플레이어 대비 기술/지식/사고방식 수준을 기준으로 판단 기준 가이드를 참고하여 등급을 선택하세요.</div>
+    ${boxes}
+    <div style="margin-top:16px">
+      <label class="form-label">메모</label>
+      <textarea id="ci-star-memo" class="form-control" rows="4" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요." onchange="ciSaveStarMemo(this.value)">${escHtml(memo || '')}</textarea>
+      <div class="text-sm text-gray" style="margin-top:6px">※ "💾 결과 저장" 시 등급과 메모가 함께 저장됩니다.</div>
+    </div>
   </div>`;
+    }
+
+    function ciSetStarLevel(level) {
+      if (!ci) return;
+      ci.starLevel = level;
+      renderCI();
+    }
+
+    function ciSaveStarMemo(val) {
+      if (!ci) return;
+      ci.starMemo = val;
     }
 
     // ── 상태 조작 함수들 ──
@@ -3699,6 +3860,8 @@ ${m.extractedText.substring(0, 3000)}
       const now = new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
       const opinion = document.getElementById('ci-opinion')?.value.trim() || '';
       ci.opinion = opinion;
+      const starMemo = document.getElementById('ci-star-memo')?.value.trim() || '';
+      ci.starMemo = starMemo;
 
       const record = {
         savedAt: now,
@@ -3711,6 +3874,8 @@ ${m.extractedText.substring(0, 3000)}
         redFlags: ci.redFlags,
         results: ci.results,
         opinion,
+        starLevel: ci.starLevel || null,
+        starMemo,
       };
 
       let saved = [];
@@ -3727,6 +3892,8 @@ ${m.extractedText.substring(0, 3000)}
       const verdict = isFail ? '🚨 불합격 (Drop)' : '✅ 합격';
       const now = new Date().toLocaleString('ko-KR');
       const opinion = document.getElementById('ci-opinion')?.value.trim() || ci.opinion || '';
+      const starMemo = document.getElementById('ci-star-memo')?.value.trim() || ci.starMemo || '';
+      const starLv = STAR_LEVELS.find(l => l.id === ci.starLevel);
 
       const rfRows = ci.redFlags.map(rf =>
         `<tr><td style="padding:6px 10px;border:1px solid #ddd">${rf.id}</td><td style="padding:6px 10px;border:1px solid #ddd">${rf.memo || '—'}</td></tr>`
@@ -3774,6 +3941,7 @@ ${m.extractedText.substring(0, 3000)}
   <h2>질문별 평가 상세</h2>
   <table><thead><tr><th style="width:50px">Q</th><th style="width:100px">카테고리</th><th style="width:100px">판정</th><th>메모</th></tr></thead><tbody>${qRows}</tbody></table>
   ${opinion ? `<h2>종합 의견</h2><div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;font-size:13px;line-height:1.8;white-space:pre-wrap">${opinion.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}
+  ${starLv ? `<h2>최종 등급 평가</h2><div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;font-size:13px;line-height:1.8"><strong>(${starLv.id}) ${starLv.label}</strong>${starMemo ? `<div style="white-space:pre-wrap;margin-top:8px;color:#555">${starMemo.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}</div>` : ''}
   <div style="text-align:center;color:#aaa;font-size:11px;margin-top:32px;border-top:1px solid #eee;padding-top:12px">채용매칭 시스템 · WOS 코어 면접 평가 · ${now}</div>
   <script>window.onload=function(){window.print();}<\/script>
   </body></html>`;
@@ -3928,8 +4096,43 @@ ${m.extractedText.substring(0, 3000)}
       </div>
       <textarea id="cird-opinion" class="form-control" rows="5" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(r.opinion || '')}</textarea>
     </div>
+    <div class="card mt-16" style="margin-top:16px">
+      <div class="flex items-center justify-between mb-12">
+        <div class="section-title">최종 등급 평가 (5단계 척도)</div>
+        <button class="btn btn-primary btn-sm" onclick="saveCIStarDetail(${idx})">저장</button>
+      </div>
+      ${STAR_LEVELS.map(lv => `
+      <div class="ci-star-box${r.starLevel === lv.id ? ' active' : ''}" onclick="cirdSetStarLevel(${idx},${lv.id})" style="border:2px solid ${r.starLevel === lv.id ? '#333' : '#e0e0e0'};border-radius:8px;padding:12px 14px;cursor:pointer;background:${r.starLevel === lv.id ? '#f5f5f5' : '#fff'};margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span class="badge badge-gray" style="font-size:11px">(${lv.id})</span>
+          <span style="font-weight:700;font-size:13px">${escHtml(lv.label)}</span>
+          ${r.starLevel === lv.id ? '<span style="margin-left:auto;font-size:12px;color:#2a9a50;font-weight:700">✓ 선택됨</span>' : ''}
+        </div>
+        <div style="font-size:12px;color:#666;line-height:1.5">${escHtml(lv.desc)}</div>
+      </div>`).join('')}
+      <div style="margin-top:16px">
+        <label class="form-label">메모</label>
+        <textarea id="cird-star-memo" class="form-control" rows="4" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요.">${escHtml(r.starMemo || '')}</textarea>
+      </div>
+    </div>
   `;
       nav('ci-result-detail');
+    }
+
+    function cirdSetStarLevel(idx, level) {
+      const all = loadCIResults();
+      if (!all[idx]) return;
+      all[idx].starLevel = level;
+      localStorage.setItem('wm_ci_results', JSON.stringify(all));
+      openCIResultDetail(idx);
+    }
+
+    function saveCIStarDetail(idx) {
+      const all = loadCIResults();
+      if (!all[idx]) return;
+      all[idx].starMemo = document.getElementById('cird-star-memo')?.value.trim() || '';
+      localStorage.setItem('wm_ci_results', JSON.stringify(all));
+      showToast('최종 등급 평가가 저장되었습니다.', 'success');
     }
 
     function saveCIOpinion(idx) {
@@ -4020,6 +4223,7 @@ ${m.extractedText.substring(0, 3000)}
   <h2>질문별 평가 상세</h2>
   <table><thead><tr><th style="width:50px">Q</th><th style="width:100px">판정</th><th>메모</th><th>비고</th></tr></thead><tbody>${qRows}</tbody></table>
   ${r.opinion ? `<h2>종합 의견</h2><div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;font-size:13px;line-height:1.8;white-space:pre-wrap">${r.opinion.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}
+  ${(() => { const lv = STAR_LEVELS.find(l => l.id === r.starLevel); return lv ? `<h2>최종 등급 평가</h2><div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;font-size:13px;line-height:1.8"><strong>(${lv.id}) ${lv.label}</strong>${r.starMemo ? `<div style="white-space:pre-wrap;margin-top:8px;color:#555">${r.starMemo.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}</div>` : ''; })()}
   <div style="text-align:center;color:#aaa;font-size:11px;margin-top:32px;border-top:1px solid #eee;padding-top:12px">채용매칭 시스템 · WOS 코어 면접 평가 · ${r.savedAt}</div>
   <script>window.onload=function(){window.print();}<\/script>
   </body></html>`;
@@ -4956,6 +5160,7 @@ ${m.extractedText.substring(0, 3000)}
       loadScheduleData();
       loadInterviewSettings();
       loadInterviewAppointments();
+      takeLocalBackup('앱 시작 시 자동 백업');
       renderDashboard();
       renderSheets();
       renderMatching();
