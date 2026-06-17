@@ -1,0 +1,6 @@
+node_modules/
+package.json
+package-lock.json
+server.mjs
+supabase_setup.sql
+auto-push.ps1
