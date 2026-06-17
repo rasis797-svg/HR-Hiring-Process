@@ -867,6 +867,7 @@
       <td class="flex gap-8" style="flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" onclick="openMatchResult(${realIdx})">결과 보기</button>
         <button class="btn ${isRejected ? 'btn-secondary' : 'btn-danger'} btn-sm" onclick="toggleRejected(${realIdx})">${isRejected ? '취소' : '불합격'}</button>
+        <button class="btn btn-secondary btn-sm" style="color:#cc3333;border-color:#cc3333" onclick="deleteApplicant(${realIdx})">삭제</button>
       </td>
     </tr>`;
       }).join('');
