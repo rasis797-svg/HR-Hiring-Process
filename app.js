@@ -2108,34 +2108,74 @@ ${m.extractedText.substring(0, 3000)}
       try { usersData = JSON.parse(localStorage.getItem('wm_users')) || []; } catch (e) { usersData = []; }
     }
 
+    const USER_ROLES = ['HR 관리자', '채용 관리자 (현업 팀장)', '시스템 관리자'];
+
     function renderUsers() {
       const tbody = document.getElementById('users-tbody');
       if (!tbody) return;
       while (tbody.rows.length > 1) tbody.deleteRow(1);
       usersData.forEach(u => {
-        const roleClass = u.role.includes('HR') ? 'badge-blue' : u.role.includes('채용') ? 'badge-orange' : 'badge-gray';
         const statusClass = u.status === '활성' ? 'badge-green' : u.status === '초대됨' ? 'badge-blue' : 'badge-gray';
+        const roleSelect = `<select class="form-control form-control-sm" style="font-size:12px;padding:4px 6px" onchange="changeUserRole('${u.id}', this.value)">
+      ${USER_ROLES.map(r => `<option value="${escHtml(r)}" ${r === u.role ? 'selected' : ''}>${escHtml(r)}</option>`).join('')}
+    </select>`;
         const tr = document.createElement('tr');
         tr.innerHTML = `
     <td><strong>${escHtml(u.name)}</strong></td>
     <td class="text-gray">${escHtml(u.email)}</td>
-    <td><span class="badge ${roleClass}">${escHtml(u.role)}</span></td>
+    <td>${roleSelect}</td>
     <td><span class="badge ${statusClass}">${escHtml(u.status)}</span></td>
     <td class="text-gray text-sm">${escHtml(u.lastLogin || '—')}</td>
     <td class="flex gap-8">
       ${u.status === '초대됨' ? `<button class="btn btn-secondary btn-sm" onclick="resendInvite('${u.id}')">초대 재전송</button>` : ''}
-      <button class="btn btn-secondary btn-sm" onclick="openModal('modal-user-perms')">권한 설정</button>
-      <button class="btn btn-danger btn-sm" onclick="deactivateUser('${u.id}')">비활성화</button>
+      ${u.status === '비활성'
+        ? `<button class="btn btn-secondary btn-sm" onclick="reactivateUser('${u.id}')">활성화</button>`
+        : `<button class="btn btn-secondary btn-sm" onclick="deactivateUser('${u.id}')">비활성화</button>`}
+      <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">삭제</button>
     </td>`;
         tbody.appendChild(tr);
       });
     }
 
+    function changeUserRole(id, role) {
+      const u = usersData.find(x => x.id === id);
+      if (!u) return;
+      u.role = role;
+      saveData();
+      addAuditLog('우성 관리자', '역할 변경', `${u.email} → ${role}`);
+      showToast(`${u.name}님의 역할이 "${role}"로 변경되었습니다.`, 'success');
+    }
+
     function deactivateUser(id) {
-      usersData = usersData.filter(u => u.id !== id);
+      const u = usersData.find(x => x.id === id);
+      if (!u) return;
+      u.status = '비활성';
       saveData();
       renderUsers();
+      addAuditLog('우성 관리자', '계정 비활성화', u.email);
       showToast('계정이 비활성화되었습니다.', 'success');
+    }
+
+    function reactivateUser(id) {
+      const u = usersData.find(x => x.id === id);
+      if (!u) return;
+      u.status = '활성';
+      saveData();
+      renderUsers();
+      addAuditLog('우성 관리자', '계정 활성화', u.email);
+      showToast('계정이 활성화되었습니다.', 'success');
+    }
+
+    function deleteUser(id) {
+      const u = usersData.find(x => x.id === id);
+      if (!u) return;
+      showConfirm('사용자 삭제', `${u.name}(${u.email}) 계정을 완전히 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`, () => {
+        usersData = usersData.filter(x => x.id !== id);
+        saveData();
+        renderUsers();
+        addAuditLog('우성 관리자', '사용자 삭제', u.email);
+        showToast('사용자가 삭제되었습니다.', 'success');
+      });
     }
 
     async function resendInvite(id) {
