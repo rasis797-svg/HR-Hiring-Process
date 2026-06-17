@@ -3509,6 +3509,8 @@ ${m.extractedText.substring(0, 3000)}
     function saveScheduleData() {
       localStorage.setItem('wm_schedule', JSON.stringify(scheduleData));
       localStorage.setItem('wm_interviewers', JSON.stringify(interviewersPool));
+      sbSave('wm_schedule', scheduleData);
+      sbSave('wm_interviewers', interviewersPool);
     }
 
     // ── 페이지 초기화 ──
@@ -4022,12 +4024,14 @@ ${m.extractedText.substring(0, 3000)}
         t.buffer = parseInt(rows[i]?.querySelector('.ivset-buf')?.value) || t.buffer;
       });
       localStorage.setItem('wm_iv_settings', JSON.stringify(interviewSettings));
+      sbSave('wm_iv_settings', interviewSettings);
       showToast('면접 설정이 저장되었습니다.', 'success');
     }
 
     function resetInterviewSettings() {
       interviewSettings = { types: JSON.parse(JSON.stringify(DEFAULT_IV_TYPES)) };
       localStorage.setItem('wm_iv_settings', JSON.stringify(interviewSettings));
+      sbSave('wm_iv_settings', interviewSettings);
       renderInterviewSettingsUI();
       showToast('초기값으로 재설정되었습니다.', 'info');
     }
@@ -4063,6 +4067,7 @@ ${m.extractedText.substring(0, 3000)}
 
     function saveInterviewAppointments() {
       localStorage.setItem('wm_iv_appts', JSON.stringify(interviewAppointments));
+      sbSave('wm_iv_appts', interviewAppointments);
     }
 
     function renderAssignList() {
