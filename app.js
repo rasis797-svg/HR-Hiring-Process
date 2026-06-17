@@ -73,9 +73,68 @@
 
     function doLogout() {
       localStorage.removeItem('wm_logged_in');
+      localStorage.removeItem('wm_invited_user');
       document.getElementById('app-screen').style.display = 'none';
       document.getElementById('auth-screen').style.display = '';
       showToast('로그아웃되었습니다.', 'info');
+    }
+
+    function applyLoginAsUser(u) {
+      const initials = (u.name || u.email).slice(0, 2).toUpperCase();
+      applyLogin({ email: u.email, name: u.name, role: u.role, initials });
+      localStorage.setItem('wm_invited_user', u.email);
+    }
+
+    async function sendLoginLink() {
+      const email = (document.getElementById('forgot-email').value || '').trim();
+      if (!email) { showToast('이메일을 입력하세요.', 'error'); return; }
+      if (!sbReady) { showToast('서버 연결을 확인할 수 없습니다.', 'error'); return; }
+      try {
+        const { error } = await sbClient.auth.signInWithOtp({
+          email,
+          options: { shouldCreateUser: false, emailRedirectTo: window.location.origin },
+        });
+        if (error) {
+          showToast(`발송 실패: ${error.message}`, 'error');
+          return;
+        }
+        showToast('로그인 링크가 발송되었습니다. 메일을 확인하세요.', 'success');
+        showPanel('login-panel');
+      } catch (e) {
+        showToast(`발송 실패: ${e.message}`, 'error');
+      }
+    }
+
+    async function handleAuthRedirect() {
+      if (!sbReady) return false;
+      if (!window.location.hash.includes('access_token')) return false;
+      const params = new URLSearchParams(window.location.hash.slice(1));
+      const access_token = params.get('access_token');
+      const refresh_token = params.get('refresh_token');
+      if (!access_token || !refresh_token) return false;
+
+      try {
+        const { data, error } = await sbClient.auth.setSession({ access_token, refresh_token });
+        history.replaceState(null, '', window.location.pathname);
+        if (error || !data.user) { showToast('로그인 링크가 만료되었거나 올바르지 않습니다.', 'error'); return false; }
+
+        const email = data.user.email;
+        let u = usersData.find(x => x.email.toLowerCase() === email.toLowerCase());
+        if (!u) {
+          const meta = data.user.user_metadata || {};
+          u = { id: data.user.id, name: meta.name || email, email, role: meta.role || 'HR 관리자', status: '활성', lastLogin: '—' };
+          usersData.push(u);
+        }
+        u.status = '활성';
+        u.lastLogin = new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        saveData();
+        applyLoginAsUser(u);
+        showToast(`${u.name}님, 환영합니다.`, 'success');
+        return true;
+      } catch (e) {
+        showToast(`로그인 처리 실패: ${e.message}`, 'error');
+        return false;
+      }
     }
 
     // ── Tabs ──
@@ -2128,6 +2187,7 @@ ${m.extractedText.substring(0, 3000)}
     <td class="text-gray text-sm">${escHtml(u.lastLogin || '—')}</td>
     <td class="flex gap-8">
       ${u.status === '초대됨' ? `<button class="btn btn-secondary btn-sm" onclick="resendInvite('${u.id}')">초대 재전송</button>` : ''}
+      ${u.status === '활성' ? `<button class="btn btn-secondary btn-sm" onclick="resendLoginEmail('${u.id}')">로그인 메일 재전송</button>` : ''}
       ${u.status === '비활성'
         ? `<button class="btn btn-secondary btn-sm" onclick="reactivateUser('${u.id}')">활성화</button>`
         : `<button class="btn btn-secondary btn-sm" onclick="deactivateUser('${u.id}')">비활성화</button>`}
@@ -2196,6 +2256,25 @@ ${m.extractedText.substring(0, 3000)}
         showToast(`${u.name}(${u.email})에게 초대 메일을 재전송했습니다.`, 'success');
       } catch (e) {
         showToast(`초대 재전송 실패: ${e.message}`, 'error');
+      }
+    }
+
+    async function resendLoginEmail(id) {
+      const u = usersData.find(x => x.id === id);
+      if (!u || !sbReady) return;
+      try {
+        const { error } = await sbClient.auth.signInWithOtp({
+          email: u.email,
+          options: { shouldCreateUser: false, emailRedirectTo: window.location.origin },
+        });
+        if (error) {
+          showToast(`로그인 메일 재전송 실패: ${error.message}`, 'error');
+          return;
+        }
+        addAuditLog('우성 관리자', '로그인 메일 재전송', u.email);
+        showToast(`${u.name}(${u.email})에게 로그인 메일을 재전송했습니다.`, 'success');
+      } catch (e) {
+        showToast(`로그인 메일 재전송 실패: ${e.message}`, 'error');
       }
     }
 
@@ -4560,6 +4639,13 @@ ${m.extractedText.substring(0, 3000)}
         const user = ADMIN_ACCOUNTS.find(a => a.email === savedEmail);
         if (user) applyLogin(user);
       }
+      const savedInvitedEmail = localStorage.getItem('wm_invited_user');
+      if (savedInvitedEmail) {
+        const u = usersData.find(x => x.email === savedInvitedEmail && x.status === '활성');
+        if (u) applyLoginAsUser(u);
+      }
+
+      handleAuthRedirect();
 
       // Supabase에서 최신 데이터 풀기 (비동기)
       loadFromSupabase();
