@@ -2031,6 +2031,7 @@ ${m.extractedText.substring(0, 3000)}
     let matchingData = [];
     let reportsData = [];
     let auditData = [];
+    let usersData = [];
 
     // ── Supabase ──
     const SB_URL = 'https://wrxizpoptgpzmotgnajg.supabase.co';
@@ -2063,6 +2064,7 @@ ${m.extractedText.substring(0, 3000)}
           await sbSave('wm_sheets', sheetsData);
           await sbSave('wm_matching', matchingData);
           await sbSave('wm_audit', auditData);
+          await sbSave('wm_users', usersData);
           await sbSave('wm_schedule', scheduleData);
           await sbSave('wm_interviewers', interviewersPool);
           await sbSave('wm_iv_appts', interviewAppointments);
@@ -2076,13 +2078,14 @@ ${m.extractedText.substring(0, 3000)}
         if (map['wm_sheets'])       { sheetsData = map['wm_sheets'];             localStorage.setItem('wm_sheets', JSON.stringify(sheetsData)); }
         if (map['wm_matching'])     { matchingData = map['wm_matching'];          localStorage.setItem('wm_matching', JSON.stringify(matchingData)); }
         if (map['wm_audit'])        { auditData = map['wm_audit'];                localStorage.setItem('wm_audit', JSON.stringify(auditData)); }
+        if (map['wm_users'])        { usersData = map['wm_users'];                localStorage.setItem('wm_users', JSON.stringify(usersData)); }
         if (map['wm_schedule'])     { scheduleData = map['wm_schedule'];          localStorage.setItem('wm_schedule', JSON.stringify(scheduleData)); }
         if (map['wm_interviewers']) { interviewersPool = map['wm_interviewers'];  localStorage.setItem('wm_interviewers', JSON.stringify(interviewersPool)); }
         if (map['wm_iv_appts'])     { interviewAppointments = map['wm_iv_appts']; localStorage.setItem('wm_iv_appts', JSON.stringify(interviewAppointments)); }
         if (map['wm_iv_settings'])  { interviewSettings = map['wm_iv_settings'];  localStorage.setItem('wm_iv_settings', JSON.stringify(interviewSettings)); }
 
         renderDashboard(); renderSheets(); renderMatching(); renderPositions();
-        renderReports(); renderAuditLog(); syncPositionDropdowns();
+        renderReports(); renderAuditLog(); renderUsers(); syncPositionDropdowns();
         showToast('클라우드 데이터 동기화 완료', 'success');
       } catch (e) { console.warn('Supabase 로드 실패:', e); }
     }
@@ -2091,15 +2094,47 @@ ${m.extractedText.substring(0, 3000)}
       localStorage.setItem('wm_sheets', JSON.stringify(sheetsData));
       localStorage.setItem('wm_matching', JSON.stringify(matchingData));
       localStorage.setItem('wm_audit', JSON.stringify(auditData));
+      localStorage.setItem('wm_users', JSON.stringify(usersData));
       sbSave('wm_sheets', sheetsData);
       sbSave('wm_matching', matchingData);
       sbSave('wm_audit', auditData);
+      sbSave('wm_users', usersData);
     }
 
     function loadData() {
       try { sheetsData = JSON.parse(localStorage.getItem('wm_sheets')) || []; } catch (e) { sheetsData = []; }
       try { matchingData = JSON.parse(localStorage.getItem('wm_matching')) || []; } catch (e) { matchingData = []; }
       try { auditData = JSON.parse(localStorage.getItem('wm_audit')) || []; } catch (e) { auditData = []; }
+      try { usersData = JSON.parse(localStorage.getItem('wm_users')) || []; } catch (e) { usersData = []; }
+    }
+
+    function renderUsers() {
+      const tbody = document.getElementById('users-tbody');
+      if (!tbody) return;
+      while (tbody.rows.length > 1) tbody.deleteRow(1);
+      usersData.forEach(u => {
+        const roleClass = u.role.includes('HR') ? 'badge-blue' : u.role.includes('채용') ? 'badge-orange' : 'badge-gray';
+        const statusClass = u.status === '활성' ? 'badge-green' : u.status === '초대됨' ? 'badge-blue' : 'badge-gray';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+    <td><strong>${escHtml(u.name)}</strong></td>
+    <td class="text-gray">${escHtml(u.email)}</td>
+    <td><span class="badge ${roleClass}">${escHtml(u.role)}</span></td>
+    <td><span class="badge ${statusClass}">${escHtml(u.status)}</span></td>
+    <td class="text-gray text-sm">${escHtml(u.lastLogin || '—')}</td>
+    <td class="flex gap-8">
+      <button class="btn btn-secondary btn-sm" onclick="openModal('modal-user-perms')">권한 설정</button>
+      <button class="btn btn-danger btn-sm" onclick="deactivateUser('${u.id}')">비활성화</button>
+    </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function deactivateUser(id) {
+      usersData = usersData.filter(u => u.id !== id);
+      saveData();
+      renderUsers();
+      showToast('계정이 비활성화되었습니다.', 'success');
     }
 
     function addAuditLog(user, action, target) {
@@ -2240,20 +2275,9 @@ ${m.extractedText.substring(0, 3000)}
           return;
         }
 
-        const roleClass = role.includes('HR') ? 'badge-blue' : role.includes('채용') ? 'badge-orange' : 'badge-gray';
-        const tbody = document.getElementById('users-tbody');
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-    <td><strong>${name}</strong></td>
-    <td class="text-gray">${email}</td>
-    <td><span class="badge ${roleClass}">${role}</span></td>
-    <td><span class="badge badge-green">초대됨</span></td>
-    <td class="text-gray text-sm">—</td>
-    <td class="flex gap-8">
-      <button class="btn btn-secondary btn-sm" onclick="openModal('modal-user-perms')">권한 설정</button>
-      <button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();showToast('계정이 비활성화되었습니다.','success')">비활성화</button>
-    </td>`;
-        tbody.appendChild(tr);
+        usersData.push({ id: String(Date.now()), name, email, role, status: '초대됨', lastLogin: '—' });
+        saveData();
+        renderUsers();
         inputs.forEach(i => i.value = '');
         closeModal('modal-add-user');
         addAuditLog('우성 관리자', '사용자 등록', email);
@@ -4443,6 +4467,7 @@ ${m.extractedText.substring(0, 3000)}
       renderPositions();
       renderReports();
       renderAuditLog();
+      renderUsers();
       syncPositionDropdowns();
 
       const savedEmail = localStorage.getItem('wm_logged_in');
