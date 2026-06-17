@@ -48,15 +48,43 @@
       { email: 'wshr@woosung.kr', pw: 'wsfeed1101!', name: '우성 관리자', role: '시스템 관리자', initials: 'WS' }
     ];
 
-    function doLogin() {
+    async function doLogin() {
       const email = document.getElementById('login-email').value.trim();
       const pw = document.getElementById('login-pw').value;
       if (!email || !pw) { showToast('이메일과 비밀번호를 입력하세요.', 'error'); return; }
+
       const user = ADMIN_ACCOUNTS.find(a => a.email === email && a.pw === pw);
-      if (!user) { showToast('이메일 또는 비밀번호가 올바르지 않습니다.', 'error'); return; }
-      localStorage.setItem('wm_logged_in', user.email);
-      applyLogin(user);
-      showToast(`${user.name}님, 환영합니다.`, 'success');
+      if (user) {
+        localStorage.setItem('wm_logged_in', user.email);
+        applyLogin(user);
+        showToast(`${user.name}님, 환영합니다.`, 'success');
+        return;
+      }
+
+      if (!sbReady) { showToast('이메일 또는 비밀번호가 올바르지 않습니다.', 'error'); return; }
+      try {
+        const { data, error } = await sbClient.auth.signInWithPassword({ email, password: pw });
+        if (error || !data.user) { showToast('이메일 또는 비밀번호가 올바르지 않습니다.', 'error'); return; }
+
+        let u = usersData.find(x => x.email.toLowerCase() === email.toLowerCase());
+        if (!u) {
+          const meta = data.user.user_metadata || {};
+          u = { id: data.user.id, name: meta.name || email, email, role: meta.role || 'HR 관리자', status: '활성', lastLogin: '—' };
+          usersData.push(u);
+        }
+        if (u.status === '비활성') {
+          showToast('비활성화된 계정입니다. 관리자에게 문의하세요.', 'error');
+          await sbClient.auth.signOut();
+          return;
+        }
+        u.status = '활성';
+        u.lastLogin = new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        saveData();
+        applyLoginAsUser(u);
+        showToast(`${u.name}님, 환영합니다.`, 'success');
+      } catch (e) {
+        showToast('이메일 또는 비밀번호가 올바르지 않습니다.', 'error');
+      }
     }
 
     function applyLogin(user) {
@@ -83,6 +111,28 @@
       const initials = (u.name || u.email).slice(0, 2).toUpperCase();
       applyLogin({ email: u.email, name: u.name, role: u.role, initials });
       localStorage.setItem('wm_invited_user', u.email);
+    }
+
+    async function changePassword() {
+      const pw = document.getElementById('new-pw').value;
+      const pwConfirm = document.getElementById('new-pw-confirm').value;
+      if (!pw || pw.length < 8) { showToast('비밀번호는 최소 8자 이상이어야 합니다.', 'error'); return; }
+      if (pw !== pwConfirm) { showToast('새 비밀번호가 일치하지 않습니다.', 'error'); return; }
+      if (!sbReady) { showToast('서버 연결을 확인할 수 없습니다.', 'error'); return; }
+      try {
+        const { data: sessionData } = await sbClient.auth.getSession();
+        if (!sessionData.session) {
+          showToast('이 계정은 비밀번호 변경을 지원하지 않습니다.', 'error');
+          return;
+        }
+        const { error } = await sbClient.auth.updateUser({ password: pw });
+        if (error) { showToast(`비밀번호 변경 실패: ${error.message}`, 'error'); return; }
+        document.getElementById('new-pw').value = '';
+        document.getElementById('new-pw-confirm').value = '';
+        showToast('비밀번호가 변경되었습니다. 다음부터 이메일/비밀번호로 로그인할 수 있습니다.', 'success');
+      } catch (e) {
+        showToast(`비밀번호 변경 실패: ${e.message}`, 'error');
+      }
     }
 
     async function sendLoginLink() {
