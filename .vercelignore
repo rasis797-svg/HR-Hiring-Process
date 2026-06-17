@@ -1,6 +1,6 @@
 node_modules/
-package.json
-package-lock.json
 server.mjs
+server.py
 supabase_setup.sql
 auto-push.ps1
+test*.mjs
