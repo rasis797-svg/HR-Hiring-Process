@@ -2032,10 +2032,68 @@ ${m.extractedText.substring(0, 3000)}
     let reportsData = [];
     let auditData = [];
 
+    // ── Supabase ──
+    const SB_URL = 'https://wrxizpoptgpzmotgnajg.supabase.co';
+    const SB_KEY = 'sb_publishable__WUC-nsBd0dX1KrQlGLc2g_D-f0R6fb';
+    let sbClient = null;
+    let sbReady = false;
+
+    function initSupabase() {
+      if (typeof supabase === 'undefined') { console.warn('Supabase SDK 로드 안 됨'); return; }
+      try {
+        sbClient = supabase.createClient(SB_URL, SB_KEY);
+        sbReady = true;
+      } catch (e) { console.warn('Supabase 초기화 실패:', e); }
+    }
+
+    async function sbSave(key, data) {
+      if (!sbReady) return;
+      try {
+        await sbClient.from('app_data').upsert({ key, value: data, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      } catch (e) { console.warn('Supabase 저장 오류:', key, e); }
+    }
+
+    async function loadFromSupabase() {
+      if (!sbReady) return;
+      try {
+        const { data, error } = await sbClient.from('app_data').select('key, value');
+        if (error) { console.warn('Supabase 로드 오류:', error); return; }
+        if (!data || data.length === 0) {
+          // 첫 실행: 현재 localStorage 데이터를 Supabase로 업로드
+          await sbSave('wm_sheets', sheetsData);
+          await sbSave('wm_matching', matchingData);
+          await sbSave('wm_audit', auditData);
+          await sbSave('wm_schedule', scheduleData);
+          await sbSave('wm_interviewers', interviewersPool);
+          await sbSave('wm_iv_appts', interviewAppointments);
+          await sbSave('wm_iv_settings', interviewSettings);
+          showToast('클라우드 초기 업로드 완료', 'success');
+          return;
+        }
+        const map = {};
+        data.forEach(row => { map[row.key] = row.value; });
+
+        if (map['wm_sheets'])       { sheetsData = map['wm_sheets'];             localStorage.setItem('wm_sheets', JSON.stringify(sheetsData)); }
+        if (map['wm_matching'])     { matchingData = map['wm_matching'];          localStorage.setItem('wm_matching', JSON.stringify(matchingData)); }
+        if (map['wm_audit'])        { auditData = map['wm_audit'];                localStorage.setItem('wm_audit', JSON.stringify(auditData)); }
+        if (map['wm_schedule'])     { scheduleData = map['wm_schedule'];          localStorage.setItem('wm_schedule', JSON.stringify(scheduleData)); }
+        if (map['wm_interviewers']) { interviewersPool = map['wm_interviewers'];  localStorage.setItem('wm_interviewers', JSON.stringify(interviewersPool)); }
+        if (map['wm_iv_appts'])     { interviewAppointments = map['wm_iv_appts']; localStorage.setItem('wm_iv_appts', JSON.stringify(interviewAppointments)); }
+        if (map['wm_iv_settings'])  { interviewSettings = map['wm_iv_settings'];  localStorage.setItem('wm_iv_settings', JSON.stringify(interviewSettings)); }
+
+        renderDashboard(); renderSheets(); renderMatching(); renderPositions();
+        renderReports(); renderAuditLog(); syncPositionDropdowns();
+        showToast('클라우드 데이터 동기화 완료', 'success');
+      } catch (e) { console.warn('Supabase 로드 실패:', e); }
+    }
+
     function saveData() {
       localStorage.setItem('wm_sheets', JSON.stringify(sheetsData));
       localStorage.setItem('wm_matching', JSON.stringify(matchingData));
       localStorage.setItem('wm_audit', JSON.stringify(auditData));
+      sbSave('wm_sheets', sheetsData);
+      sbSave('wm_matching', matchingData);
+      sbSave('wm_audit', auditData);
     }
 
     function loadData() {
