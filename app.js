@@ -2019,9 +2019,15 @@ ${m.extractedText.substring(0, 3000)}
       const colors = ['#333', '#555', '#777', '#2a9a50'];
       wrap.innerHTML = stages.map((s, i) => {
         const widthPct = Math.max(10, Math.round((s.count / max) * 100));
-        return `<div style="margin:0 auto 8px;width:${widthPct}%;background:${colors[i]};color:#fff;border-radius:6px;padding:10px 12px;text-align:center;transition:width 0.2s">
-      <div style="font-size:12px;opacity:0.85">${escHtml(s.label)}</div>
-      <div style="font-size:18px;font-weight:700">${s.count}명</div>
+        const pct = max ? Math.round((s.count / max) * 100) : 0;
+        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <div style="flex:1;display:flex;justify-content:center">
+        <div style="width:${widthPct}%;background:${colors[i]};color:#fff;border-radius:6px;padding:6px 10px;text-align:center;transition:width 0.2s">
+          <div style="font-size:11px;opacity:0.85">${escHtml(s.label)}</div>
+          <div style="font-size:14px;font-weight:700">${s.count}명</div>
+        </div>
+      </div>
+      <div style="width:42px;flex-shrink:0;text-align:right;font-size:12px;color:#888">${pct}%</div>
     </div>`;
       }).join('');
     }
