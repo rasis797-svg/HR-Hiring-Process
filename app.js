@@ -3946,7 +3946,7 @@ ${m.extractedText.substring(0, 3000)}
     <div class="flex items-center gap-12">
       <button class="btn btn-secondary btn-sm" onclick="ciGoBackToEdit()">← 수정하기</button>
       <div>
-        <div class="page-title">면접 결과 — ${escHtml(ci.name)}</div>
+        <div class="page-title">코어 면접 결과 — ${escHtml(ci.name)}</div>
         <div class="page-subtitle">${escHtml(ci.pos)} · ${ci.track === 'leader' ? '리더급' : '팀원급'}</div>
       </div>
     </div>
@@ -3972,7 +3972,7 @@ ${m.extractedText.substring(0, 3000)}
   </div>
   <div class="card">
     <div class="section-title mb-12">종합 의견</div>
-    <textarea id="ci-opinion" class="form-control" rows="10" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(ci.opinion || '')}</textarea>
+    <textarea id="ci-opinion" class="form-control" rows="10" style="min-height:460px" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(ci.opinion || '')}</textarea>
     <div class="text-sm text-gray" style="margin-top:6px">※ "💾 결과 저장" 시 함께 저장됩니다.</div>
   </div>
   ${renderCIStarSection(ci.starLevel, ci.starMemo)}`;
@@ -3997,7 +3997,7 @@ ${m.extractedText.substring(0, 3000)}
     ${boxes}
     <div style="margin-top:16px">
       <label class="form-label">메모</label>
-      <textarea id="ci-star-memo" class="form-control" rows="10" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요." onchange="ciSaveStarMemo(this.value)">${escHtml(memo || '')}</textarea>
+      <textarea id="ci-star-memo" class="form-control" rows="10" style="min-height:460px" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요." onchange="ciSaveStarMemo(this.value)">${escHtml(memo || '')}</textarea>
       <div class="text-sm text-gray" style="margin-top:6px">※ "💾 결과 저장" 시 등급과 메모가 함께 저장됩니다.</div>
     </div>
   </div>`;
@@ -4329,7 +4329,7 @@ ${m.extractedText.substring(0, 3000)}
       saved.unshift(record);
       localStorage.setItem('wm_ci_results', JSON.stringify(saved));
       addAuditLog('우성 관리자', '면접 결과 저장', `${ci.name} (${ci.pos}) → ${verdict}`);
-      showToast('면접 결과가 저장되었습니다. "면접 결과" 메뉴에서 확인하세요.', 'success');
+      showToast('면접 결과가 저장되었습니다. "코어 면접 결과" 메뉴에서 확인하세요.', 'success');
     }
 
     function printCIResult() {
@@ -4368,7 +4368,7 @@ ${m.extractedText.substring(0, 3000)}
       }).join('');
 
       const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
-  <title>면접 결과 — ${ci.name}</title>
+  <title>코어 면접 결과 — ${ci.name}</title>
   <style>
     body { font-family: -apple-system, 'Malgun Gothic', sans-serif; font-size: 13px; color: #333; padding: 32px; max-width: 900px; margin: 0 auto; }
     h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
@@ -4464,7 +4464,7 @@ ${m.extractedText.substring(0, 3000)}
       if (!r) return;
       currentCIResultIdx = idx;
 
-      document.getElementById('cird-title').textContent = `면접 결과 — ${r.name}`;
+      document.getElementById('cird-title').textContent = `코어 면접 결과 — ${r.name}`;
       document.getElementById('cird-subtitle').textContent = `${r.pos} · ${r.track === 'leader' ? '리더급' : '팀원급'} · ${r.savedAt}`;
 
       const isFail = r.isFail;
@@ -4543,7 +4543,7 @@ ${m.extractedText.substring(0, 3000)}
         <div class="section-title">종합 의견</div>
         <button class="btn btn-primary btn-sm" onclick="saveCIOpinion(${idx})">저장</button>
       </div>
-      <textarea id="cird-opinion" class="form-control" rows="10" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(r.opinion || '')}</textarea>
+      <textarea id="cird-opinion" class="form-control" rows="10" style="min-height:460px" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(r.opinion || '')}</textarea>
     </div>
     <div class="card mt-16" style="margin-top:16px">
       <div class="flex items-center justify-between mb-12">
@@ -4561,7 +4561,7 @@ ${m.extractedText.substring(0, 3000)}
       </div>`).join('')}
       <div style="margin-top:16px">
         <label class="form-label">메모</label>
-        <textarea id="cird-star-memo" class="form-control" rows="10" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요.">${escHtml(r.starMemo || '')}</textarea>
+        <textarea id="cird-star-memo" class="form-control" rows="10" style="min-height:460px" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요.">${escHtml(r.starMemo || '')}</textarea>
       </div>
     </div>
   `;
@@ -4686,7 +4686,7 @@ ${m.extractedText.substring(0, 3000)}
       }).join('');
 
       const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
-  <title>면접 결과 — ${r.name}</title>
+  <title>코어 면접 결과 — ${r.name}</title>
   <style>
     body{font-family:-apple-system,'Malgun Gothic',sans-serif;font-size:13px;color:#333;padding:32px;max-width:900px;margin:0 auto}
     h1{font-size:20px;font-weight:700;margin-bottom:4px}
@@ -5177,9 +5177,46 @@ ${m.extractedText.substring(0, 3000)}
   </div>
   <div class="card">
     <div class="section-title mb-12">종합 의견</div>
-    <textarea id="qq-opinion" class="form-control" rows="10" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(qq.opinion || '')}</textarea>
+    <textarea id="qq-opinion" class="form-control" rows="10" style="min-height:460px" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(qq.opinion || '')}</textarea>
     <div class="text-sm text-gray" style="margin-top:6px">※ "💾 결과 저장" 시 함께 저장됩니다.</div>
+  </div>
+  ${renderQQStarSection(qq.starLevel, qq.starMemo)}`;
+    }
+
+    // ── 5단계 최종 등급 평가 + 메모 (과제 면접 결과 화면 하단) ──
+    function renderQQStarSection(selectedLevel, memo) {
+      const boxes = STAR_LEVELS.map(lv => `
+    <div class="ci-star-box${selectedLevel === lv.id ? ' active' : ''}" onclick="qqSetStarLevel(${lv.id})" style="border:2px solid ${selectedLevel === lv.id ? '#333' : '#e0e0e0'};border-radius:8px;padding:12px 14px;cursor:pointer;background:${selectedLevel === lv.id ? '#f5f5f5' : '#fff'};margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span class="badge badge-gray" style="font-size:11px">(${lv.id})</span>
+        <span style="font-weight:700;font-size:13px">${escHtml(lv.label)}</span>
+        ${selectedLevel === lv.id ? '<span style="margin-left:auto;font-size:12px;color:#2a9a50;font-weight:700">✓ 선택됨</span>' : ''}
+      </div>
+      <div style="font-size:12px;color:#666;line-height:1.5">${escHtml(lv.desc)}</div>
+    </div>`).join('');
+
+      return `
+  <div class="card" style="margin-top:16px">
+    <div class="section-title mb-4">최종 등급 평가 (5단계 척도)</div>
+    <div class="text-sm text-gray mb-16">동 레벨 스타플레이어 대비 기술/지식/사고방식 수준을 기준으로 판단 기준 가이드를 참고하여 등급을 선택하세요.</div>
+    ${boxes}
+    <div style="margin-top:16px">
+      <label class="form-label">메모</label>
+      <textarea id="qq-star-memo" class="form-control" rows="10" style="min-height:460px" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요." onchange="qqSaveStarMemo(this.value)">${escHtml(memo || '')}</textarea>
+      <div class="text-sm text-gray" style="margin-top:6px">※ "💾 결과 저장" 시 등급과 메모가 함께 저장됩니다.</div>
+    </div>
   </div>`;
+    }
+
+    function qqSetStarLevel(level) {
+      if (!qq) return;
+      qq.starLevel = level;
+      renderQQ();
+    }
+
+    function qqSaveStarMemo(val) {
+      if (!qq) return;
+      qq.starMemo = val;
     }
 
     function saveQQResult() {
@@ -5189,6 +5226,8 @@ ${m.extractedText.substring(0, 3000)}
       const now = new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
       const opinion = document.getElementById('qq-opinion')?.value.trim() || '';
       qq.opinion = opinion;
+      const starMemo = document.getElementById('qq-star-memo')?.value.trim() || '';
+      qq.starMemo = starMemo;
 
       const record = {
         phase: 5,
@@ -5203,6 +5242,8 @@ ${m.extractedText.substring(0, 3000)}
         questions: qq.questions.map(q => ({ id: q.id, label: q.label, axis: q.axis, group: q.group, question: q.question, criteria: q.criteria })),
         results: qq.results,
         opinion,
+        starLevel: qq.starLevel || null,
+        starMemo,
       };
 
       let saved = [];
@@ -5219,6 +5260,8 @@ ${m.extractedText.substring(0, 3000)}
       const verdict = isFail ? '🚨 불합격 (Drop)' : '✅ 합격';
       const now = new Date().toLocaleString('ko-KR');
       const opinion = document.getElementById('qq-opinion')?.value.trim() || qq.opinion || '';
+      const starMemo = document.getElementById('qq-star-memo')?.value.trim() || qq.starMemo || '';
+      const starLv = STAR_LEVELS.find(l => l.id === qq.starLevel);
 
       const qRows = qq.questions.map(q => {
         const r = qq.results[q.id] || {};
@@ -5251,6 +5294,7 @@ ${m.extractedText.substring(0, 3000)}
   <h2>질문별 평가 상세</h2>
   <table><thead><tr><th style="width:50px">Q</th><th>항목</th><th style="width:140px">판정</th><th>메모</th></tr></thead><tbody>${qRows}</tbody></table>
   ${opinion ? `<h2>종합 의견</h2><div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;font-size:13px;line-height:1.8;white-space:pre-wrap">${opinion.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}
+  ${starLv ? `<h2>최종 등급 평가</h2><div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;font-size:13px;line-height:1.8"><strong>(${starLv.id}) ${starLv.label}</strong>${starMemo ? `<div style="white-space:pre-wrap;margin-top:8px;color:#555">${starMemo.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}</div>` : ''}
   <div style="text-align:center;color:#aaa;font-size:11px;margin-top:32px;border-top:1px solid #eee;padding-top:12px">채용매칭 시스템 · 과제 면접 평가 · ${now}</div>
   <script>window.onload=function(){window.print();}<\/script>
   </body></html>`;
@@ -5387,10 +5431,45 @@ ${m.extractedText.substring(0, 3000)}
         <div class="section-title">종합 의견</div>
         <button class="btn btn-primary btn-sm" onclick="saveQQOpinion(${idx})">저장</button>
       </div>
-      <textarea id="qqrd-opinion" class="form-control" rows="10" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(r.opinion || '')}</textarea>
+      <textarea id="qqrd-opinion" class="form-control" rows="10" style="min-height:460px" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(r.opinion || '')}</textarea>
+    </div>
+    <div class="card mt-16" style="margin-top:16px">
+      <div class="flex items-center justify-between mb-12">
+        <div class="section-title">최종 등급 평가 (5단계 척도)</div>
+        <button class="btn btn-primary btn-sm" onclick="saveQQStarDetail(${idx})">저장</button>
+      </div>
+      ${STAR_LEVELS.map(lv => `
+      <div class="ci-star-box${r.starLevel === lv.id ? ' active' : ''}" onclick="qqrdSetStarLevel(${idx},${lv.id})" style="border:2px solid ${r.starLevel === lv.id ? '#333' : '#e0e0e0'};border-radius:8px;padding:12px 14px;cursor:pointer;background:${r.starLevel === lv.id ? '#f5f5f5' : '#fff'};margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span class="badge badge-gray" style="font-size:11px">(${lv.id})</span>
+          <span style="font-weight:700;font-size:13px">${escHtml(lv.label)}</span>
+          ${r.starLevel === lv.id ? '<span style="margin-left:auto;font-size:12px;color:#2a9a50;font-weight:700">✓ 선택됨</span>' : ''}
+        </div>
+        <div style="font-size:12px;color:#666;line-height:1.5">${escHtml(lv.desc)}</div>
+      </div>`).join('')}
+      <div style="margin-top:16px">
+        <label class="form-label">메모</label>
+        <textarea id="qqrd-star-memo" class="form-control" rows="10" style="min-height:460px" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요.">${escHtml(r.starMemo || '')}</textarea>
+      </div>
     </div>
   `;
       nav('qq-result-detail');
+    }
+
+    function qqrdSetStarLevel(idx, level) {
+      const all = loadQQResults();
+      if (!all[idx]) return;
+      all[idx].starLevel = level;
+      localStorage.setItem('wm_qq_results', JSON.stringify(all));
+      openQQResultDetail(idx);
+    }
+
+    function saveQQStarDetail(idx) {
+      const all = loadQQResults();
+      if (!all[idx]) return;
+      all[idx].starMemo = document.getElementById('qqrd-star-memo')?.value.trim() || '';
+      localStorage.setItem('wm_qq_results', JSON.stringify(all));
+      showToast('최종 등급 평가가 저장되었습니다.', 'success');
     }
 
     function qqrdRecomputeVerdict(r) {
