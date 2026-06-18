@@ -3034,54 +3034,292 @@ ${m.extractedText.substring(0, 3000)}
         main: '과거 업무를 수행하면서 가장 비효율적이라고 느꼈던 운영 이슈와 그것을 개선한 사례를 구체적으로 말씀해 주세요.',
         failNote: '※ 개선 경험 자체가 없는 경우 즉시 불합격 처리 및 1-1~1-6 전체 스킵',
         subs: [
-          { id: '1-1', q: '그 문제는 처음에 어떤 계기로 인식하셨나요? 그 문제가 시급하다고 공감하게 된 이유는 무엇이었나요?', green: '내재 동기 / 스스로 이유 찾음', red: '지시받아서 함 / 이유 모름 (수동성)' },
-          { id: '1-2', q: '그 문제를 해결하기 위해 어떤 방식으로 접근하셨나요? 솔루션을 선택한 논리를 설명해 주세요.', green: '가설 검증 기반 접근', red: '맥락 없는 방법론 / 몸빵', branch: ['덧셈형', '뺄셈형'] },
-          { id: '1-3', q: '실행 단계에서 어떤 구체적인 조치를 취하셨나요? 숫자나 수치로 설명해 주시겠어요?', green: '6하원칙 + 수치 기반', red: '디테일 없음 / 수치 부재' },
-          { id: '1-4', q: '[덧셈형] 이 솔루션이 문제의 본질을 파악한 것인지, 표면적 증상만 건드린 건 아닌지 어떻게 확인하셨나요?\n[뺄셈형] 이 솔루션을 선택하지 않았을 때 어떤 리스크가 있었는지 어떻게 분석하셨나요?', green: '문제 본질 파악 / 득실 분석', red: '무논리 / 시켜서 함', dynamic: true },
-          { id: '1-5', q: '그 개선이 지금도 유지되고 있나요? 담당자가 바뀌어도 유지되도록 어떤 장치를 만드셨나요?', green: '시스템화 / 강제화', red: '사람 의존 / 개인 노트 수준' },
-          { id: '1-6', q: '지금 그 시점으로 돌아간다면 어떻게 다르게 접근하시겠어요? 그 해결책의 구조적 한계는 무엇이었나요?', green: '구조적 개선 방향 제시', red: '대안 없음 / 교육 타령' },
+          {
+            id: '1-1', q: '그 문제는 처음에 어떤 계기로 인식하셨나요? 그 문제가 시급하다고 공감하게 된 이유는 무엇이었나요?', green: '내재 동기 / 스스로 이유 찾음', red: '지시받아서 함 / 이유 모름 (수동성)',
+            detail: {
+              green: [
+                { tag: '내재 동기', desc: '업무 중 병목/비효율을 직접 발견, 비용/시간 낭비가 심각하다고 데이터로 판단해 자발적으로 시작' },
+                { tag: "시작은 지시였으나 '이유'를 찾음", examples: ['처음엔 팀장님 지시로 시작했지만, 데이터를 뜯어보니 매달 3천만 원씩 누수되고 있어서 바로 수행했습니다.'] },
+              ],
+              red: [
+                { tag: '이유 부재', examples: ['올해 KPI로 잡혀 있어서 했습니다', '지시가 있어서 수행했습니다'] },
+              ],
+            },
+          },
+          {
+            id: '1-2', q: '그 문제를 해결하기 위해 어떤 방식으로 접근하셨나요? 솔루션을 선택한 논리를 설명해 주세요.', green: '가설 검증 기반 접근', red: '맥락 없는 방법론 / 몸빵', branch: ['덧셈형', '뺄셈형'],
+            detail: {
+              green: [
+                { tag: '가설-검증', desc: '문제의 근본 원인에 맞춰 최적의 수단을 선택' },
+                { tag: '시스템 도입', examples: ['엑셀 양식을 통일/자동화했습니다', '프로세스 단계를 삭제했습니다', '전산 툴을 도입해 원천 봉쇄했습니다', '자동화는 못 해서 파일 제목 양식을 통일하고 폴더 구조를 바꿨습니다'] },
+              ],
+              red: [
+                { tag: '맥락 없는 방법론', examples: ['요즘 AI가 트렌드라서', '전 직장에서 썼던 거라 그냥 가져왔습니다'] },
+                { tag: '몸으로 때우기', examples: ['제가 일찍 출근해서 처리했습니다', '담당자들을 교육하고 꼼꼼히 크로스 체크했습니다'] },
+              ],
+            },
+          },
+          {
+            id: '1-3', q: '실행 단계에서 어떤 구체적인 조치를 취하셨나요? 숫자나 수치로 설명해 주시겠어요?', green: '6하원칙 + 수치 기반', red: '디테일 없음 / 수치 부재',
+            detail: {
+              green: [
+                { tag: '디테일', desc: '장애물(반발, 시스템 오류 등)을 6하원칙으로 생생하게 묘사' },
+                { tag: '숫자', examples: ['소요 시간이 3일에서 3시간으로 줄었습니다', '불량률이 0%가 됐습니다'] },
+              ],
+              red: [
+                { tag: '디테일 부재', desc: '질문에 멈칫하거나 "전반적으로 힘들었습니다"로 얼버무림' },
+                { tag: '숫자 부재', examples: ['좋아졌습니다', '편해졌습니다', '효율화됐습니다 (구체적 증거 없음)'] },
+              ],
+            },
+          },
+          {
+            id: '1-4', q: '[덧셈형] 이 솔루션이 문제의 본질을 파악한 것인지, 표면적 증상만 건드린 건 아닌지 어떻게 확인하셨나요?\n[뺄셈형] 이 솔루션을 선택하지 않았을 때 어떤 리스크가 있었는지 어떻게 분석하셨나요?', green: '문제 본질 파악 / 득실 분석', red: '무논리 / 시켜서 함', dynamic: true, branch: ['덧셈형', '뺄셈형'],
+            cases: [
+              {
+                name: 'CASE 1. 덧셈형 솔루션', desc: '검수 단계 추가, 인력 투입, 보고서 양식 신설 등',
+                green: [
+                  { tag: '재해석', examples: ['그땐 급해서 인력을 늘렸지만, A단계 승인 절차 자체가 무의미했습니다. 없앴다면 인력 추가 없이도 해결됐을 겁니다'] },
+                  { tag: '본질 파악', examples: ['그 보고서는 팀장님 불안감 때문에 만든 거지 실무엔 불필요했습니다. 없애고 데이터 대시보드로 대체하겠습니다'] },
+                ],
+                red: [
+                  { tag: '방어', examples: ['안전을 위해 무조건 더블 체크가 필요합니다. 단순화할 건 없습니다'] },
+                  { tag: '외재론/완벽주의 포장', examples: ['회사 룰이라서', '그때 솔루션이 최적이었습니다', '지시가 그렇게 와서 바꿀 수 없습니다'] },
+                ],
+              },
+              {
+                name: 'CASE 2. 뺄셈형 솔루션', desc: '보고서 제거, 중간 단계 생략, 통합 축소 등',
+                green: [
+                  { tag: '득실 분석', examples: ['리스크는 1% 미만인데 유지 비용은 연간 1억이었습니다. 사고 나면 제가 책임진다고 설득하고 없앴습니다'] },
+                  { tag: '본질 집중', examples: ['고객이 원하는 건 빠른 배송이지 예쁜 포장이 아니라 판단해 포장 단계를 뺐습니다'] },
+                  { tag: '시스템적 사고', examples: ['더블체크는 사람이 하는 거라 지속가능성이 없다고 판단했습니다', '복잡성을 더하면 속도가 느려져 단순한 쪽을 택했습니다'] },
+                ],
+                red: [
+                  { tag: "무논리('왜'가 없음)", examples: ['그냥 너무 복잡했습니다. 없애니까 효율화됐습니다', '그게 최적이라고 판단했습니다'] },
+                  { tag: '시켜서', examples: ['팀장님/본부장님이 그 솔루션이 맞다고 해서 그렇게 개선했습니다'] },
+                ],
+              },
+            ],
+          },
+          {
+            id: '1-5', q: '그 개선이 지금도 유지되고 있나요? 담당자가 바뀌어도 유지되도록 어떤 장치를 만드셨나요?', green: '시스템화 / 강제화', red: '사람 의존 / 개인 노트 수준', tier: 'three',
+            detail: {
+              green: [
+                { tag: '자동화/강제화', examples: ['전산상 입력값이 안 맞으면 저장이 안 되게 막아둬서 누가 와도 결과가 같습니다', '매일 새벽 서버에서 스크립트가 자동으로 돕니다', '프로세스와 전산을 같이 바꿔 입력 단계부터 오류 여지가 없습니다'] },
+                { tag: '공식 기록', examples: ['Post-Mortem(사후 회고) 문서를 작성해 전사에 공유했습니다'] },
+                { tag: '재발 방지', examples: ["신규 입사자 온보딩 가이드에 '절대 하지 말 것' 리스트를 추가했습니다"] },
+                { tag: '툴/프로세스 개선', examples: ['프로세스상 그 단계가 생략되도록 툴을 바꿨습니다'] },
+                { tag: '기초적 변경', examples: ['엑셀 서식 자체를 수정해 필수 값을 안 넣으면 빨간불이 들어오게 했습니다', '공용 폴더 쓰기 권한을 막고 읽기만 줬습니다'] },
+              ],
+              hold: [
+                { tag: '사람 의존', examples: ['담당자가 체크리스트를 안 보면 실수가 날 수 있습니다', '인수인계는 했지만 사람이 바뀌면 흔들릴 수 있습니다', '안내서·알림은 있지만 입력값을 잘못하면 오류가 날 수 있습니다'] },
+                { tag: '시스템화 부재', examples: ['제 업무 노트에 적어두고 항상 되새깁니다'] },
+              ],
+            },
+          },
+          {
+            id: '1-6', q: '지금 그 시점으로 돌아간다면 어떻게 다르게 접근하시겠어요? 그 해결책의 구조적 한계는 무엇이었나요?', green: '구조적 개선 방향 제시', red: '대안 없음 / 교육 타령',
+            detail: {
+              green: [
+                { tag: '구조적 개선', examples: ['지금이라면 노코드 툴(Zapier 등)로 이메일 접수부터 자동화하겠습니다', '사람 검수 단계를 없애고 양식을 객관식으로 바꿔 오입력을 막겠습니다'] },
+              ],
+              red: [
+                { tag: '대안 부재/사람 의존', examples: ['교육을 강화하겠습니다', '휴먼에러를 100% 막긴 어렵습니다', '체크리스트를 더 강화하겠습니다'] },
+              ],
+            },
+          },
         ]
       },
       {
         id: 'Q2', cat: '성과정의', leaderOnly: false,
         main: '이 포지션에서 "성과를 낸다"는 것이 무엇을 의미한다고 생각하시나요?',
+        mainSummary: { green: "'숫자' 위주, 개선·개척 등 부가가치 창출", red: '처리·수행=성과 / 답변 미흡' },
+        mainDetail: {
+          green: [
+            { tag: "'숫자' 위주, 부가가치 창출", examples: ['기존 비효율을 00% 줄인 것', '새 구조를 만든 것', '문제를 해결해 비용을 아낀 것'] },
+          ],
+          red: [
+            { tag: '처리·수행=성과', examples: ['납기일 준수', '시킨 일을 실수 없이 처리', '야근하며 성실히 수행', '문제가 안 생기게 하는 것'] },
+            { tag: '답변 미흡', desc: "대답 못 함 / 애매함 / '성과'를 정의하지 못함" },
+          ],
+        },
         subs: [
-          { id: '2-1', q: '방금 말씀하신 성과를 왜 성과라고 부를 수 있나요? 그 지표가 의미 있는 이유는 무엇인가요?', green: '사업적 연결 설명', red: '왜(Why) 설명 불가' },
-          { id: '2-2', q: '리소스가 부족한 상황에서도 그 성과를 달성하신 경험이 있으신가요? 어떻게 극복하셨나요?', green: '전략적 실행 / 창의적 극복', red: '수동적 / 포기 / 타협', noExpPopup: true },
-          { id: '2-3', q: '그 당시 정말 가능하다고 믿으셨나요? 믿으셨다면 어떤 근거로 믿으셨나요?', green: '가능성 탐색 / 근거 제시', red: '환경 탓 / 합리화' },
+          {
+            id: '2-1', q: '방금 말씀하신 성과를 왜 성과라고 부를 수 있나요? 그 지표가 의미 있는 이유는 무엇인가요?', green: '사업적 연결 설명', red: '왜(Why) 설명 불가',
+            detail: {
+              green: [
+                { tag: '사업/직군 목표와 연결', examples: ['이 지표는 근본적으로 불량률을 낮추는 데 있고, 불량률이 낮아지면 AS 비용이 줄어 비용 절감으로 이어지므로 이 포지션의 성과입니다'] },
+              ],
+              red: [
+                { tag: "'왜'의 부재", examples: ['그렇게 설정해 관리해왔다', '해보니 유효한 것 같다', '불량률을 줄이는 건 중요하다', '대부분 회사도 이 지표를 중요하게 관리한다'] },
+                { tag: '답변 미흡', desc: '대답 못 함 / 애매함' },
+              ],
+            },
+          },
+          {
+            id: '2-2', q: '리소스가 부족한 상황에서도 그 성과를 달성하신 경험이 있으신가요? 어떻게 극복하셨나요?', green: '전략적 실행 / 창의적 극복', red: '수동적 / 포기 / 타협', noExpPopup: true,
+            detail: {
+              green: [
+                { tag: '스스로 실행', examples: ['유사 사례를 검색했습니다', '목표·계획부터 정의했습니다', '작게라도 일단 실행했습니다'] },
+                { tag: '창의적/학습으로 해결', examples: ['무료 툴 3개를 조합했습니다', '인력이 없어 파이썬을 배워 직접 자동화했습니다', '데이터가 없어 경쟁사 리뷰 1,000개를 긁어 분석했습니다'] },
+                { tag: '전략적 헌신', examples: ['당장은 야근했지만 동시에 루틴 업무는 윗선에 말해 잠시 중단시켰습니다', '몸으로 때우면서 다음엔 안 그러려고 매뉴얼을 만들었습니다'] },
+                { tag: '선택과 집중', examples: ['10개를 다 못 하니 매출에 직결되는 핵심 2개에 자원을 쏟고 나머지는 버렸습니다'] },
+                { tag: '하이브리드(실행 병행/선행)', examples: ['목표·계획을 세운 뒤 리소스 할당을 논리적으로 제안하는 동시에, 결과와 무관하게 실행할 수 있는 것부터 해보겠습니다'] },
+              ],
+              red: [
+                { tag: '수동적 실행', examples: ['인사팀·본부장께 인력 충원을 계속 요청했습니다 (결국 안 됨)'] },
+                { tag: '단순 반복', examples: ['팀원 힘들까 봐 말 안 하고 혼자 풀로 야근했습니다'] },
+                { tag: '단순 버림·타협', examples: ['예산·기일에 맞춰 퀄리티를 전반적으로 낮췄습니다'] },
+                { tag: '무조건 갖춰져야 함', examples: ['최소 예산은 확보해야 하니 예산 확보 기획안부터 다시 올리겠습니다'] },
+              ],
+            },
+          },
+          {
+            id: '2-3', q: '그 당시 정말 가능하다고 믿으셨나요? 믿으셨다면 어떤 근거로 믿으셨나요?', green: '가능성 탐색 / 근거 제시', red: '환경 탓 / 합리화',
+            detail: {
+              green: [
+                { tag: '가능성 탐색', examples: ['물리적으로 힘들었지만 하긴 해야 한다고 봤습니다', 'A는 안 돼도 B는 될 거라 믿었습니다', '지원이 없으면 없는 대로 방법을 찾는 게 제 역할입니다'] },
+              ],
+              red: [
+                { tag: '환경 탓·합리화', examples: ['회사니까 어쩔 수 없죠', '불가능하다고 생각했지만 까라면 까야 해서 억지로 했습니다', '윗선에도 안 된다고 못 박고 시작했습니다'] },
+              ],
+            },
+          },
         ]
       },
       {
         id: 'Q3', cat: '진화적학습', leaderOnly: false,
         main: '지금까지 커리어에서 가장 뼈아프게 느꼈던 오판이나 실패 경험, 혹은 이직을 결심하게 된 계기를 솔직하게 말씀해 주세요.',
         subs: [
-          { id: '3-1', q: '그 상황으로 다시 돌아간다면 어떻게 다르게 행동하시겠어요?', green: '"나"를 포함한 방법론 수정', red: '남 탓 / 환경 탓 (외부 귀인)' },
+          {
+            id: '3-1', q: '그 상황으로 다시 돌아간다면 어떻게 다르게 행동하시겠어요?', green: '"나"를 포함한 방법론 수정', red: '남 탓 / 환경 탓 (외부 귀인)',
+            detail: {
+              green: [
+                { tag: '과거 방식 폐기', examples: ['A사에서 쓰던 방식 자체를 버리고 여기에 맞는 B안(MVP)으로 접근했을 겁니다'] },
+                { tag: '자아 성찰', examples: ['제 고집을 꺾고 현장 실무자 피드백을 먼저 수용해 계획을 수정했을 겁니다'] },
+                { tag: '방법론 수정', examples: ['완벽한 기획보다 더 빨리 실패하고 데이터를 얻는 쪽으로 프로세스를 바꿨을 겁니다'] },
+              ],
+              red: [
+                { tag: '조건 제약', examples: ['그때 예산을 더 확보하고 시작했을 겁니다'] },
+                { tag: '남 탓', examples: ['특정 팀이 못 따라온 거라, 팀원을 더 다그쳐서라도 제 가이드대로 했을 겁니다'] },
+                { tag: '유효하지 않은 상황 통제', examples: ['경영진을 설득해 방향을 유지했을 겁니다'] },
+                { tag: '회고 부족', examples: ['다 해봤다고 생각해서 바꿀 게 없습니다'] },
+              ],
+            },
+          },
         ]
       },
       {
         id: 'Q4', cat: '협업방식', leaderOnly: false,
         main: '협업 과정에서 가장 어려웠던 순간은 언제였나요? 그 원인이 무엇이었다고 생각하세요?',
         subs: [
-          { id: '4-1', q: '[A.구조적] 그 구조적 문제를 해결하기 위해 본인이 직접 할 수 있는 일은 무엇이었나요?\n[B.사람] 그 사람과의 갈등을 해결하기 위해 어떤 방법을 택하셨나요?\n[C.없음] 한 번도 어려운 협업 상황이 없으셨나요?', green: '내가 할 수 있는 일에 집중', red: '정치적 행동 / 방관', branch: ['A. 구조적 원인', 'B. 사람 문제', 'C. 없음'] },
+          {
+            id: '4-1', q: '[A.구조적] 그 구조적 문제를 해결하기 위해 본인이 직접 할 수 있는 일은 무엇이었나요?\n[B.사람] 그 사람과의 갈등을 해결하기 위해 어떤 방법을 택하셨나요?\n[C.없음] 한 번도 어려운 협업 상황이 없으셨나요?', green: '내가 할 수 있는 일에 집중', red: '정치적 행동 / 방관', branch: ['A. 구조적 원인', 'B. 사람 문제', 'C. 없음'],
+            cases: [
+              {
+                name: 'CASE A. 구조적 문제(R&R 불명확, 권한 부재)',
+                red: [{ tag: '수동적', examples: ['나설 수 없어 팀장께 R&R 정리를 요청하고 제 파트만 방어했습니다'] }],
+                green: [{ tag: "'내'가 할 수 있는 것부터", examples: ['R&R 따질 시간에 제가 먼저 초안 잡아 돌리고 총대 멨습니다'] }],
+              },
+              {
+                name: 'CASE B. 특정 사람(빌런의 성향/무능)',
+                red: [
+                  { tag: '방관/정치', examples: ['제가 못 바꾸니 기다렸습니다', '윗선에 그 사람 문제를 계속 어필했습니다'] },
+                  { tag: '사람 중심 대체/우회', examples: ['그 사람은 빼고 다른 사람들이랑만 일했습니다'] },
+                ],
+                green: [{ tag: '업무 중심 대체/우회', examples: ['설득을 포기하고 밤새 프로토타입을 만들어 눈으로 보여줬습니다', '그분이 못 하겠다 해서 제가 노코드 툴을 배워 그 부분만 메웠습니다'] }],
+              },
+              {
+                name: 'CASE C. "특별히 어려운 적 없다(원만했다)"',
+                red: [
+                  { tag: '권위 의존자', examples: ['윗분들이 개입했거나 윗분들에 의해 진행된 업무가 대부분이라 충돌이 적었습니다'] },
+                  { tag: '평화주의자', examples: ['제가 갈등을 싫어해 조율하며 가는 편입니다'] },
+                ],
+                green: [{ tag: '프로페셔널', examples: ["매번 치열하게 논쟁했지만, 감정적으로 '어렵다' 느끼지 않고 정답을 찾는 당연한 과정으로 봐서 원만했다고 표현한 것입니다"] }],
+              },
+            ],
+          },
         ]
       },
       {
         id: 'Q5', cat: '시스템핏', leaderOnly: false,
         main: 'WOS는 업무 경계(R&R)가 명시적으로 정해지지 않은 환경입니다. 필요하다면 누구의 업무든 먼저 나서서 해결해야 하는 문화인데, 이런 방식에 대해 어떻게 생각하시나요?',
+        mainSummary: { green: '자율성 갈망 / 오너십 증명 / 행동 약속', red: '방어 기제 / 조건부 수용 / 포기' },
+        mainDetail: {
+          green: [
+            { tag: '자율성 갈망', examples: ['오히려 좋습니다. 전 직장에선 R&R 때문에 더 할 수 있는 일이 막혀 답답했습니다. 퀘스트 단위면 한계 없이 성과 내기 더 좋습니다'] },
+            { tag: '오너십 증명', examples: ['회사에 Grey Area는 항상 생깁니다. 일이 몰리는 건 실력을 증명할 기회라 문제없습니다'] },
+            { tag: '행동 약속', examples: ['처음엔 혼란스럽겠지만 목표만 명확하면 수단·방법 가리지 않고 제가 룰을 세팅하며 일하겠습니다'] },
+          ],
+          red: [
+            { tag: '방어 기제', desc: '권리·보호망부터 찾음', examples: ['그러면 성과 평가는 어떻게 받나요?', '과부하 오면 회사가 조율해 주나요?'] },
+            { tag: '조건부 수용', desc: 'WOS 철학 부정', examples: ['지금은 장점도 있지만 회사가 커지면 결국 R&R을 엄격히 갖춰야 합니다'] },
+            { tag: '포기', desc: '깔끔한 이별', examples: ['저는 전문 분야에만 뾰족하게 집중하고 싶어 결이 안 맞는 것 같습니다'] },
+          ],
+        },
         subs: []
       },
       {
         id: 'Q6', cat: '리더십', leaderOnly: true,
         main: '리더로서 팀원의 성과가 기대에 미치지 못할 때, 어떤 방식으로 코칭하시나요?',
         subs: [
-          { id: 'L1', q: '실제로 팀원을 코칭해서 성과를 끌어올린 구체적인 사례를 말씀해 주시겠어요?', green: '구체적 코칭 프로세스 제시', red: '방관 / 위임만 함' },
-          { id: 'L2', q: '팀 내 원칙이나 윤리 기준을 어긴 팀원이 있었을 때, 어떻게 처리하셨나요?', green: '즉각 징계 / 원칙 고수', red: '은폐 / 눈감기' },
-          { id: 'L3', q: '전사 목표를 위해 본인 팀의 리소스를 희생해야 했던 경험이 있으신가요?', green: '전사 최적화 / 자원 재배치', red: '부서 이기주의 / 거부' },
+          {
+            id: 'L1', q: '실제로 팀원을 코칭해서 성과를 끌어올린 구체적인 사례를 말씀해 주시겠어요?', green: '구체적 코칭 프로세스 제시', red: '방관 / 위임만 함',
+            detail: {
+              red: [
+                { tag: '대리 수행', desc: '리더가 아닌 고연봉 실무자', examples: ['답답해서 그냥 제가 야근해 처리했습니다'] },
+                { tag: '방관/통보', desc: '코칭 부재', examples: ['면담으로 주의 주고, 안 되면 인사팀에 조치 요구'] },
+              ],
+              green: [
+                { tag: '원인 타격', examples: ["'열심히 해라'가 아니라 업무 프로세스를 뜯어보고 병목이 되는 특정 기술/툴 하나를 짚어 훈련시켰습니다"] },
+                { tag: '작은 성공', examples: ['난이도 낮춘 독립 퀘스트로 성공의 맛을 먼저 본 뒤 점진적으로 올렸습니다'] },
+              ],
+            },
+          },
+          {
+            id: 'L2', q: '팀 내 원칙이나 윤리 기준을 어긴 팀원이 있었을 때, 어떻게 처리하셨나요?', green: '즉각 징계 / 원칙 고수', red: '은폐 / 눈감기',
+            detail: {
+              red: [
+                { tag: '은폐/타협', examples: ['이번 프로젝트만 끝내고 조용히 타이르겠습니다'] },
+                { tag: '책임 전가', desc: '비겁함', examples: ['익명으로 제보해 제 손에 피를 안 묻히겠습니다'] },
+              ],
+              green: [
+                { tag: '즉각 조치', examples: ['단기 매출이 날아가도 즉시 공식 징계 절차를 밟습니다. 에이스의 일탈을 묵인하면 팀 전체 룰이 무너져 장기적으로 회사를 망칩니다'] },
+              ],
+            },
+          },
+          {
+            id: 'L3', q: '전사 목표를 위해 본인 팀의 리소스를 희생해야 했던 경험이 있으신가요?', green: '전사 최적화 / 자원 재배치', red: '부서 이기주의 / 거부',
+            detail: {
+              red: [
+                { tag: '방어 본능', desc: '부분 최적화', examples: ['팀을 지키는 게 리더 역할입니다. 인력·예산을 안 뺏기려 방어 논리를 짰습니다'] },
+              ],
+              green: [
+                { tag: '자기 파괴적 전략', desc: '회사 중심 자원 재배치', examples: ['우리 팀 업무를 자동화한 뒤 잉여 인력을 신사업 팀으로 먼저 파견 보내자고 경영진에 제안했습니다'] },
+              ],
+            },
+          },
         ]
       },
       {
         id: 'Q7', cat: '역질문', leaderOnly: false, isReverse: true,
         main: '지원자분께서 저희에게 궁금한 점이 있으시면 자유롭게 질문해 주세요.',
+        detail: {
+          b1: {
+            title: 'B-1. 역질문 성향 판별',
+            red: [
+              { tag: '소비자 마인드', examples: ['워라밸은 어떤가요?', '복지·보상 시스템은요?'] },
+              { tag: '지적 허영/평론가', examples: ['업계 트렌드에 대한 회사 철학은?', '아까 그 전략은 리스크가 있는데 대안이 있나요?'] },
+            ],
+            green: [
+              { tag: "'내 일'부터 확인", examples: ['다음 주에 입사한다면 회사가 가장 시급히 풀길 바라는 최대 병목 한 가지는?', '이 포지션에서 과거 실패한 분이 있다면 그 실패의 가장 큰 원인은?'] },
+            ],
+          },
+          b2: {
+            title: "B-2. '조건 탐색형' 역질문 카운터 펀치",
+            red: { reaction: '시선이 흔들리고 당황한 기색이 역력함', answer: '예산이 아예 없나요? 최소한의 디자인 리소스나 마케팅 비용은 있어야 실행할 텐데요…', judgement: '자원이 없으면 본인 퍼포먼스도 없다고 방어막을 치는 전형적 수행자 → 앞서 아무리 포장했어도 즉시 탈락' },
+            green: { reaction: '잠깐 놀라도 이내 현실을 수용하고 우회로를 찾기 시작함', answer: '오히려 백지라 제가 세팅할 권한이 크겠네요. 예산 0원이면 발로 뛰어 타겟 커뮤니티 바이럴부터 해보겠습니다. 타 부서 리소스를 협상해 빌려오는 건 가능합니까?', judgement: '결핍을 핑계 삼지 않고 현실적 대안을 찾음' },
+          },
+        },
         subs: []
       },
     ];
@@ -3350,6 +3588,7 @@ ${m.extractedText.substring(0, 3000)}
         redFlags: [],     // [{qId, subId, label}]
         branchSel: {},    // {subId: idx}
         counterPunch: false,
+        detailOpen: new Set(), // 펼쳐진 상세 판정 기준 id 집합
         done: false,
       };
       renderCI();
@@ -3460,6 +3699,63 @@ ${m.extractedText.substring(0, 3000)}
       }
     }
 
+    // ── 질문별 상세 판정 기준 (접이식) ──
+    function ciToggleDetail(id) {
+      if (ci.detailOpen.has(id)) ci.detailOpen.delete(id); else ci.detailOpen.add(id);
+      renderCI();
+    }
+
+    function renderCIDetailToggle(id) {
+      const open = ci.detailOpen.has(id);
+      return `<button type="button" class="ci-detail-toggle" onclick="ciToggleDetail('${id}')">${open ? '▾ 상세 판정 기준 숨기기' : '▸ 상세 판정 기준 보기'}</button>`;
+    }
+
+    function renderCIDetailGroup(label, cls, items) {
+      if (!items || !items.length) return '';
+      const rows = items.map(it => `
+      <div class="ci-detail-item">
+        <div class="ci-detail-tag">${escHtml(it.tag)}</div>
+        ${it.desc ? `<div class="ci-detail-desc">${escHtml(it.desc)}</div>` : ''}
+        ${(it.examples || []).map(ex => `<div class="ci-detail-example">"${escHtml(ex)}"</div>`).join('')}
+      </div>`).join('');
+      return `<div class="ci-detail-group ${cls}"><div class="ci-detail-group-title">${label}</div>${rows}</div>`;
+    }
+
+    function renderCIDetailStandard(detail, tier) {
+      if (!detail) return '<div class="ci-detail-panel"><div class="ci-detail-empty">상세 기준이 아직 등록되지 않았습니다.</div></div>';
+      const redKey = tier === 'three' ? 'hold' : 'red';
+      const redLabel = tier === 'three' ? '⚠️ 보류 / 탈락' : '🚨 Red Flag';
+      return `<div class="ci-detail-panel">
+      ${renderCIDetailGroup('✅ Green', 'green', detail.green)}
+      ${renderCIDetailGroup(redLabel, 'red', detail[redKey])}
+    </div>`;
+    }
+
+    function renderCIDetailCaseBranch(sub) {
+      const idx = ci.branchSel[sub.id];
+      if (idx == null || !sub.cases || !sub.cases[idx]) {
+        return `<div class="ci-detail-panel"><div class="ci-detail-empty">먼저 위에서 분기(CASE)를 선택하면 해당 CASE의 상세 기준이 표시됩니다.</div></div>`;
+      }
+      const c = sub.cases[idx];
+      return `<div class="ci-detail-panel">
+      <div class="ci-detail-case-title">${escHtml(c.name)}</div>
+      ${renderCIDetailGroup('✅ Green', 'green', c.green)}
+      ${renderCIDetailGroup('🚨 Red Flag', 'red', c.red)}
+    </div>`;
+    }
+
+    function renderCIDetailSimulation(sim) {
+      if (!sim) return '';
+      const block = (label, cls, d) => !d ? '' : `
+      <div class="ci-detail-group ${cls}">
+        <div class="ci-detail-group-title">${label}</div>
+        <div class="ci-detail-item"><div class="ci-detail-tag">반응</div><div class="ci-detail-desc">${escHtml(d.reaction)}</div></div>
+        <div class="ci-detail-item"><div class="ci-detail-tag">답변</div><div class="ci-detail-example">"${escHtml(d.answer)}"</div></div>
+        <div class="ci-detail-item"><div class="ci-detail-tag">판단</div><div class="ci-detail-desc">${escHtml(d.judgement)}</div></div>
+      </div>`;
+      return `<div class="ci-detail-panel">${block('✅ Green Flag', 'green', sim.green)}${block('🚨 Red Flag', 'red', sim.red)}</div>`;
+    }
+
     // ── 메인 질문 렌더 ──
     function renderCIMain(q, res) {
       const pre = ci.preAnswered[q.id] || new Set();
@@ -3470,6 +3766,15 @@ ${m.extractedText.substring(0, 3000)}
       ${q.leaderOnly ? '<span class="badge badge-orange" style="font-size:11px">리더 전용</span>' : ''}
     </div>
     <div class="ci-script">${escHtml(q.main)}</div>`;
+
+      if (q.mainSummary) {
+        html += `<div class="ci-hint-row">
+      <div class="ci-hint ci-hint-g">✅ Green: ${escHtml(q.mainSummary.green)}</div>
+      <div class="ci-hint ci-hint-r">🚨 Red Flag: ${escHtml(q.mainSummary.red)}</div>
+    </div>`;
+        html += renderCIDetailToggle(`${q.id}-main`);
+        if (ci.detailOpen.has(`${q.id}-main`)) html += renderCIDetailStandard(q.mainDetail);
+      }
 
       if (q.failNote) {
         html += `<div style="font-size:12px;color:#cc3333;background:#fff0f0;border:1px solid #f0bbbb;border-radius:6px;padding:8px 12px;margin-bottom:14px">${escHtml(q.failNote)}</div>`;
@@ -3490,7 +3795,7 @@ ${m.extractedText.substring(0, 3000)}
       html += `<textarea class="ci-memo" placeholder="면접관 메모..." onchange="ciSaveMemo('${q.id}','main',this.value)">${escHtml(res.mainMemo || '')}</textarea>`;
 
       if (q.isReverse) {
-        html += renderCIReverseGuide();
+        html += renderCIReverseGuide(q);
       } else {
         html += `<div class="ci-flag-row">
       <button class="ci-btn-g${res.mainFlag === 'green' ? ' sel' : ''}" onclick="ciSetFlag('${q.id}','main','green')">✅ Green (합격)</button>
@@ -3523,10 +3828,16 @@ ${m.extractedText.substring(0, 3000)}
         : sub.q;
       html_parts.push(`<div class="ci-script sub${pre.has(sub.id) ? ' ci-dimmed' : ''}">${escHtml(scriptTxt)}</div>`);
 
+      const redLabel = sub.tier === 'three' ? '⚠️ 보류/탈락' : '🚨 Red Flag';
       html_parts.push(`<div class="ci-hint-row">
     <div class="ci-hint ci-hint-g">✅ Green: ${escHtml(sub.green)}</div>
-    <div class="ci-hint ci-hint-r">🚨 Red Flag: ${escHtml(sub.red)}</div>
+    <div class="ci-hint ci-hint-r">${redLabel}: ${escHtml(sub.red)}</div>
   </div>`);
+
+      html_parts.push(renderCIDetailToggle(sub.id));
+      if (ci.detailOpen.has(sub.id)) {
+        html_parts.push(sub.cases ? renderCIDetailCaseBranch(sub) : renderCIDetailStandard(sub.detail, sub.tier));
+      }
 
       html_parts.push(`<div class="ci-skip-toggle">
     <button class="ci-skip-opt${!skip ? ' on-p' : ''}" onclick="ciProceed('${q.id}','${sub.id}',false)">▶ 진행 (Proceed)</button>
@@ -3549,7 +3860,7 @@ ${m.extractedText.substring(0, 3000)}
         html_parts.push(`<textarea class="ci-memo" placeholder="면접관 메모..." onchange="ciSaveMemo('${q.id}','${sub.id}',this.value)">${escHtml(subRes.memo || '')}</textarea>`);
         html_parts.push(`<div class="ci-flag-row">
       <button class="ci-btn-g${subRes.flag === 'green' ? ' sel' : ''}" onclick="ciSetFlag('${q.id}','${sub.id}','green')">✅ Green (합격)</button>
-      <button class="ci-btn-r${subRes.flag === 'red' ? ' sel' : ''}" onclick="ciSetFlag('${q.id}','${sub.id}','red')">🚨 Red Flag</button>
+      <button class="ci-btn-r${subRes.flag === 'red' ? ' sel' : ''}" onclick="ciSetFlag('${q.id}','${sub.id}','red')">${redLabel}</button>
     </div>`);
       }
 
@@ -3557,7 +3868,7 @@ ${m.extractedText.substring(0, 3000)}
     }
 
     // ── Q7 역질문 가이드 ──
-    function renderCIReverseGuide() {
+    function renderCIReverseGuide(q) {
       const isLeader = ci.track === 'leader';
       const green = isLeader
         ? '조직 비전 얼라인먼트, 권한/책임 범위, 전사 병목 해결에 대한 질문'
@@ -3587,7 +3898,13 @@ ${m.extractedText.substring(0, 3000)}
   <div class="ci-flag-row">
     <button class="ci-btn-g${(ci.results['Q7'] || {}).mainFlag === 'green' ? ' sel' : ''}" onclick="ciSetFlag('Q7','main','green')">✅ Green (합격)</button>
     <button class="ci-btn-r${(ci.results['Q7'] || {}).mainFlag === 'red' ? ' sel' : ''}" onclick="ciSetFlag('Q7','main','red')">🚨 Red Flag</button>
-  </div>`;
+  </div>
+  ${renderCIDetailToggle('Q7-detail')}
+  ${ci.detailOpen.has('Q7-detail') && q?.detail ? `
+  <div class="ci-detail-case-title" style="margin-top:10px">${escHtml(q.detail.b1?.title || '')}</div>
+  ${renderCIDetailStandard(q.detail.b1)}
+  <div class="ci-detail-case-title" style="margin-top:10px">${escHtml(q.detail.b2?.title || '')}</div>
+  ${renderCIDetailSimulation(q.detail.b2)}` : ''}`;
     }
 
     function ciCounterPunch() {
