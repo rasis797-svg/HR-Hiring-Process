@@ -2,6 +2,28 @@
     let currentPage = '';
     let currentUserRole = '';
 
+    // ── 사이드바 그룹 접기/펼치기 ──
+    function toggleNavGroup(name) {
+      const wrap = document.getElementById(`nav-group-${name}`);
+      const toggle = document.querySelector(`.nav-group-toggle[onclick="toggleNavGroup('${name}')"]`);
+      if (!wrap) return;
+      const collapsed = wrap.style.display === 'none';
+      wrap.style.display = collapsed ? '' : 'none';
+      if (toggle) toggle.classList.toggle('collapsed', !collapsed);
+      localStorage.setItem(`wm_navgroup_${name}`, collapsed ? 'open' : 'collapsed');
+    }
+
+    function initNavGroups() {
+      ['interview'].forEach(name => {
+        if (localStorage.getItem(`wm_navgroup_${name}`) === 'collapsed') {
+          const wrap = document.getElementById(`nav-group-${name}`);
+          const toggle = document.querySelector(`.nav-group-toggle[onclick="toggleNavGroup('${name}')"]`);
+          if (wrap) wrap.style.display = 'none';
+          if (toggle) toggle.classList.add('collapsed');
+        }
+      });
+    }
+
     // ── Navigation ──
     function nav(page) {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -3972,7 +3994,7 @@ ${m.extractedText.substring(0, 3000)}
   </div>
   <div class="card">
     <div class="section-title mb-12">종합 의견</div>
-    <textarea id="ci-opinion" class="form-control" rows="10" style="min-height:460px" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(ci.opinion || '')}</textarea>
+    <textarea id="ci-opinion" class="form-control" rows="10" style="width:100%;box-sizing:border-box;height:5cm" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(ci.opinion || '')}</textarea>
     <div class="text-sm text-gray" style="margin-top:6px">※ "💾 결과 저장" 시 함께 저장됩니다.</div>
   </div>
   ${renderCIStarSection(ci.starLevel, ci.starMemo)}`;
@@ -3997,7 +4019,7 @@ ${m.extractedText.substring(0, 3000)}
     ${boxes}
     <div style="margin-top:16px">
       <label class="form-label">메모</label>
-      <textarea id="ci-star-memo" class="form-control" rows="10" style="min-height:460px" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요." onchange="ciSaveStarMemo(this.value)">${escHtml(memo || '')}</textarea>
+      <textarea id="ci-star-memo" class="form-control" rows="10" style="width:100%;box-sizing:border-box;height:5cm" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요." onchange="ciSaveStarMemo(this.value)">${escHtml(memo || '')}</textarea>
       <div class="text-sm text-gray" style="margin-top:6px">※ "💾 결과 저장" 시 등급과 메모가 함께 저장됩니다.</div>
     </div>
   </div>`;
@@ -4497,7 +4519,7 @@ ${m.extractedText.substring(0, 3000)}
               <button class="ci-btn-r${sf === 'red' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="cirdSetFlag(${idx},'${qId}','${sid}','red')">🚨 Red</button>`}
               ${sv.reason ? `<span style="font-size:11px;color:#aaa">스킵 사유: ${escHtml(sv.reason)}</span>` : ''}
             </div>
-            ${!skip ? `<textarea class="form-control" style="font-size:12px" rows="2" placeholder="메모..." onchange="cirdSaveMemo(${idx},'${qId}','${sid}',this.value)">${escHtml(sv.memo || '')}</textarea>` : ''}
+            ${!skip ? `<textarea class="form-control" style="font-size:12px;width:100%;box-sizing:border-box" rows="2" placeholder="메모..." onchange="cirdSaveMemo(${idx},'${qId}','${sid}',this.value)">${escHtml(sv.memo || '')}</textarea>` : ''}
           </div>`;
           }).join('');
           return `<div class="card mb-8" style="padding:0;overflow:hidden">
@@ -4508,7 +4530,7 @@ ${m.extractedText.substring(0, 3000)}
               <button class="ci-btn-g${mFlag === 'green' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="cirdSetFlag(${idx},'${qId}','main','green')">✅ Green</button>
               <button class="ci-btn-r${mFlag === 'red' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="cirdSetFlag(${idx},'${qId}','main','red')">🚨 Red Flag</button>
             </div>
-            <textarea class="form-control" style="font-size:12px" rows="2" placeholder="메모..." onchange="cirdSaveMemo(${idx},'${qId}','main',this.value)">${escHtml(res.mainMemo || '')}</textarea>
+            <textarea class="form-control" style="font-size:12px;width:100%;box-sizing:border-box" rows="2" placeholder="메모..." onchange="cirdSaveMemo(${idx},'${qId}','main',this.value)">${escHtml(res.mainMemo || '')}</textarea>
           </div>
           ${subItems}
         </div>`;
@@ -4543,7 +4565,7 @@ ${m.extractedText.substring(0, 3000)}
         <div class="section-title">종합 의견</div>
         <button class="btn btn-primary btn-sm" onclick="saveCIOpinion(${idx})">저장</button>
       </div>
-      <textarea id="cird-opinion" class="form-control" rows="10" style="min-height:460px" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(r.opinion || '')}</textarea>
+      <textarea id="cird-opinion" class="form-control" rows="10" style="width:100%;box-sizing:border-box;height:5cm" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(r.opinion || '')}</textarea>
     </div>
     <div class="card mt-16" style="margin-top:16px">
       <div class="flex items-center justify-between mb-12">
@@ -4561,7 +4583,7 @@ ${m.extractedText.substring(0, 3000)}
       </div>`).join('')}
       <div style="margin-top:16px">
         <label class="form-label">메모</label>
-        <textarea id="cird-star-memo" class="form-control" rows="10" style="min-height:460px" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요.">${escHtml(r.starMemo || '')}</textarea>
+        <textarea id="cird-star-memo" class="form-control" rows="10" style="width:100%;box-sizing:border-box;height:5cm" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요.">${escHtml(r.starMemo || '')}</textarea>
       </div>
     </div>
   `;
@@ -5177,7 +5199,7 @@ ${m.extractedText.substring(0, 3000)}
   </div>
   <div class="card">
     <div class="section-title mb-12">종합 의견</div>
-    <textarea id="qq-opinion" class="form-control" rows="10" style="min-height:460px" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(qq.opinion || '')}</textarea>
+    <textarea id="qq-opinion" class="form-control" rows="10" style="width:100%;box-sizing:border-box;height:5cm" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(qq.opinion || '')}</textarea>
     <div class="text-sm text-gray" style="margin-top:6px">※ "💾 결과 저장" 시 함께 저장됩니다.</div>
   </div>
   ${renderQQStarSection(qq.starLevel, qq.starMemo)}`;
@@ -5202,7 +5224,7 @@ ${m.extractedText.substring(0, 3000)}
     ${boxes}
     <div style="margin-top:16px">
       <label class="form-label">메모</label>
-      <textarea id="qq-star-memo" class="form-control" rows="10" style="min-height:460px" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요." onchange="qqSaveStarMemo(this.value)">${escHtml(memo || '')}</textarea>
+      <textarea id="qq-star-memo" class="form-control" rows="10" style="width:100%;box-sizing:border-box;height:5cm" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요." onchange="qqSaveStarMemo(this.value)">${escHtml(memo || '')}</textarea>
       <div class="text-sm text-gray" style="margin-top:6px">※ "💾 결과 저장" 시 등급과 메모가 함께 저장됩니다.</div>
     </div>
   </div>`;
@@ -5413,7 +5435,7 @@ ${m.extractedText.substring(0, 3000)}
               <option value="">-- Red Flag 유형 선택 --</option>
               ${RED_FLAG_TYPES.map(t => `<option value="${escHtml(t)}"${res.redFlagType === t ? ' selected' : ''}>${escHtml(t)}</option>`).join('')}
             </select>` : ''}
-            ${!skip ? `<textarea class="form-control" style="font-size:12px" rows="2" placeholder="메모..." onchange="qqrdSaveMemo(${idx},'${q.id}',this.value)">${escHtml(res.memo || '')}</textarea>` : ''}
+            ${!skip ? `<textarea class="form-control" style="font-size:12px;width:100%;box-sizing:border-box" rows="2" placeholder="메모..." onchange="qqrdSaveMemo(${idx},'${q.id}',this.value)">${escHtml(res.memo || '')}</textarea>` : ''}
           </div>
         </div>`;
         }).join('')
@@ -5431,7 +5453,7 @@ ${m.extractedText.substring(0, 3000)}
         <div class="section-title">종합 의견</div>
         <button class="btn btn-primary btn-sm" onclick="saveQQOpinion(${idx})">저장</button>
       </div>
-      <textarea id="qqrd-opinion" class="form-control" rows="10" style="min-height:460px" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(r.opinion || '')}</textarea>
+      <textarea id="qqrd-opinion" class="form-control" rows="10" style="width:100%;box-sizing:border-box;height:5cm" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(r.opinion || '')}</textarea>
     </div>
     <div class="card mt-16" style="margin-top:16px">
       <div class="flex items-center justify-between mb-12">
@@ -5449,7 +5471,7 @@ ${m.extractedText.substring(0, 3000)}
       </div>`).join('')}
       <div style="margin-top:16px">
         <label class="form-label">메모</label>
-        <textarea id="qqrd-star-memo" class="form-control" rows="10" style="min-height:460px" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요.">${escHtml(r.starMemo || '')}</textarea>
+        <textarea id="qqrd-star-memo" class="form-control" rows="10" style="width:100%;box-sizing:border-box;height:5cm" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요.">${escHtml(r.starMemo || '')}</textarea>
       </div>
     </div>
   `;
@@ -6458,6 +6480,7 @@ ${m.extractedText.substring(0, 3000)}
       renderAuditLog();
       renderUsers();
       syncPositionDropdowns();
+      initNavGroups();
 
       const savedEmail = localStorage.getItem('wm_logged_in');
       if (savedEmail) {

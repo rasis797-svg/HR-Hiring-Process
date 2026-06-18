@@ -141,6 +141,46 @@
       padding-left: 24px;
     }
 
+    .nav-group-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: #555;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .nav-group-toggle:hover {
+      background: #e8e8e8;
+      color: #222;
+    }
+
+    .nav-group-toggle-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav-group-toggle-main svg {
+      flex-shrink: 0;
+      opacity: 0.7;
+    }
+
+    .nav-group-chevron {
+      flex-shrink: 0;
+      opacity: 0.6;
+      transition: transform 0.15s;
+    }
+
+    .nav-group-toggle.collapsed .nav-group-chevron {
+      transform: rotate(-90deg);
+    }
+
     .main {
       flex: 1;
       min-width: 0;

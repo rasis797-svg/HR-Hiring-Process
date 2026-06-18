@@ -118,35 +118,47 @@
           </svg>
           면접질문리포트
         </div>
-        <span class="sidebar-label" style="margin-top:16px">면접</span>
-        <div class="nav-item nav-item-sub" data-nav="mini-quest" onclick="nav('mini-quest')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2l3 6 6 1-4.5 4.5 1 6L12 17l-5.5 2.5 1-6L3 9l6-1z" />
+        <div class="nav-group-toggle" style="margin-top:16px" onclick="toggleNavGroup('interview')">
+          <span class="nav-group-toggle-main">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+            </svg>
+            면접
+          </span>
+          <svg id="nav-group-chevron-interview" class="nav-group-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9" />
           </svg>
-          과제 면접
         </div>
-        <div class="nav-item nav-item-sub" data-nav="qq-results" onclick="nav('qq-results')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 11l3 3L22 4" />
-            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-          </svg>
-          과제 면접 결과
-        </div>
-        <div class="nav-item nav-item-sub" data-nav="core-interview" onclick="nav('core-interview')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M23 21v-2a4 4 0 00-3-3.87" />
-            <path d="M16 3.13a4 4 0 010 7.75" />
-          </svg>
-          코어 면접
-        </div>
-        <div class="nav-item nav-item-sub" data-nav="ci-results" onclick="nav('ci-results')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 11l3 3L22 4" />
-            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-          </svg>
-          코어 면접 결과
+        <div id="nav-group-interview">
+          <div class="nav-item nav-item-sub" data-nav="mini-quest" onclick="nav('mini-quest')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2l3 6 6 1-4.5 4.5 1 6L12 17l-5.5 2.5 1-6L3 9l6-1z" />
+            </svg>
+            과제 면접
+          </div>
+          <div class="nav-item nav-item-sub" data-nav="qq-results" onclick="nav('qq-results')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 11l3 3L22 4" />
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+            </svg>
+            과제 면접 결과
+          </div>
+          <div class="nav-item nav-item-sub" data-nav="core-interview" onclick="nav('core-interview')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 00-3-3.87" />
+              <path d="M16 3.13a4 4 0 010 7.75" />
+            </svg>
+            코어 면접
+          </div>
+          <div class="nav-item nav-item-sub" data-nav="ci-results" onclick="nav('ci-results')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 11l3 3L22 4" />
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+            </svg>
+            코어 면접 결과
+          </div>
         </div>
         <div class="nav-item" data-nav="schedule" onclick="nav('schedule')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
