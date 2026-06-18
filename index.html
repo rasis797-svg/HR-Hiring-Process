@@ -259,6 +259,28 @@
               </div>
             </div>
           </div>
+
+          <div class="grid-2 gap-24 mt-16">
+            <div class="card">
+              <div class="section-title mb-12">진행 단계별 현황</div>
+              <div id="dash-stage-summary"></div>
+            </div>
+            <div class="card">
+              <div class="section-title mb-12">월별 최종합격 현황</div>
+              <div id="dash-monthly-hires"></div>
+            </div>
+          </div>
+
+          <div class="grid-2 gap-24 mt-16">
+            <div class="card">
+              <div class="section-title mb-12">Recruitment Funnel</div>
+              <div id="dash-funnel"></div>
+            </div>
+            <div class="card">
+              <div class="section-title mb-12">소싱채널별 채용인원</div>
+              <div id="dash-channel-hires"></div>
+            </div>
+          </div>
         </div>
 
         <!-- ── Positions ── -->
@@ -654,7 +676,7 @@
 
           <div class="card mb-16">
             <div class="section-title mb-16">포지션 선택</div>
-            <div class="form-row">
+            <div class="form-row-3">
               <div class="form-group">
                 <label class="form-label">대상 포지션 <span class="required">*</span></label>
                 <select id="upload-position-select" class="form-control">
@@ -664,6 +686,15 @@
               <div class="form-group">
                 <label class="form-label">지원자명 <span class="required">*</span></label>
                 <input id="upload-applicant-name" class="form-control" placeholder="지원자 이름을 입력하세요" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">소싱 채널 <span class="required">*</span></label>
+                <select id="upload-channel-select" class="form-control">
+                  <option value="">소싱 채널을 선택하세요</option>
+                  <option value="온라인">온라인</option>
+                  <option value="헤드헌터">헤드헌터</option>
+                  <option value="추천채용">추천채용</option>
+                </select>
               </div>
             </div>
           </div>

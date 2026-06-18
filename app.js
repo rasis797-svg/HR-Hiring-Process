@@ -1015,8 +1015,10 @@
     function runAnalysis() {
       const position = document.getElementById('upload-position-select').value;
       const applicant = document.getElementById('upload-applicant-name').value.trim();
+      const channel = document.getElementById('upload-channel-select')?.value || '';
       if (!position) { showToast('대상 포지션을 선택하세요.', 'error'); return; }
       if (!applicant) { showToast('지원자명을 입력하세요.', 'error'); return; }
+      if (!channel) { showToast('소싱 채널을 선택하세요.', 'error'); return; }
 
       let sourceLabel = '';
       if (resumeInputMode === 'file') {
@@ -1034,7 +1036,7 @@
       const today = new Date().toLocaleDateString('ko-KR',
         { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace('.', '');
       const entry = {
-        applicant, position, date: today, source: sourceLabel,
+        applicant, position, date: today, source: sourceLabel, channel,
         extractedText: resumeExtractedText || '',
         score: '—', sub1: '—', sub2: '—', sub3: '—',
         analysis: null, reportData: null,
@@ -1050,6 +1052,7 @@
       document.getElementById('resume-paste-text').value = ''; updatePasteCount();
       document.getElementById('upload-position-select').value = '';
       document.getElementById('upload-applicant-name').value = '';
+      document.getElementById('upload-channel-select').value = '';
       switchResumeTab('file');
 
       openMatchResult(idx); // async — AI 또는 키워드 분석
@@ -1833,6 +1836,13 @@ ${m.extractedText.substring(0, 3000)}
       });
     }
 
+    function daysBetween(startStr, endStr) {
+      const start = new Date((startStr || '').replace(/\./g, '-'));
+      const end = new Date((endStr || '').replace(/\./g, '-'));
+      if (isNaN(start) || isNaN(end)) return null;
+      return Math.max(0, Math.round((end - start) / 86400000));
+    }
+
     function renderDashboard() {
       const posCount = sheetsData.length;
       const resCount = matchingData.length;
@@ -1909,6 +1919,8 @@ ${m.extractedText.substring(0, 3000)}
             const hasReport = applicants.filter(m => m.reportData?.interview_questions).length;
             const status = getPosStatus(s);
             const badgeCls = status === '채용중' ? 'badge-blue' : status === '채용완료' ? 'badge-purple' : 'badge-gray';
+            const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace('.', '');
+            const elapsed = daysBetween(s.created, s.completedDate || today);
             return `<div style="padding:10px 0;${i < posRows.length - 1 ? 'border-bottom:1px solid #f0f0f0' : ''}">
           <div class="flex items-center justify-between mb-6">
             <div class="flex items-center gap-8">
@@ -1921,12 +1933,118 @@ ${m.extractedText.substring(0, 3000)}
             <span>지원자 ${applicants.length}명</span>
             <span>평균 ${avg != null ? avg.toFixed(1) + '/5' : '—'}</span>
             <span>리포트 ${hasReport}건</span>
+            <span>경과 ${elapsed != null ? elapsed + '일' : '—'}</span>
             <span>${escHtml(s.team)}</span>
           </div>
         </div>`;
           }).join('');
         }
       }
+
+      renderDashStageSummary();
+      renderDashMonthlyHires();
+      renderDashFunnel();
+      renderDashChannelHires();
+    }
+
+    // ── 진행 단계별 현황 ──
+    function renderDashStageSummary() {
+      const wrap = document.getElementById('dash-stage-summary');
+      if (!wrap) return;
+      const active = matchingData.filter(m => !m.rejected);
+      const reviewing = active.filter(m => !m.procStatus).length;
+      const assignment = active.filter(m => m.procStatus === '과제/공통면접').length;
+      const finalInterview = active.filter(m => m.procStatus === '최종면접').length;
+      wrap.innerHTML = `
+    <div class="grid-3 gap-16">
+      <div class="stat-card">
+        <div class="stat-label">검토중</div>
+        <div class="stat-value">${reviewing}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">과제/공통면접</div>
+        <div class="stat-value">${assignment}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">최종면접</div>
+        <div class="stat-value">${finalInterview}</div>
+      </div>
+    </div>`;
+    }
+
+    // ── 월별 최종합격 현황 ──
+    function renderDashMonthlyHires() {
+      const wrap = document.getElementById('dash-monthly-hires');
+      if (!wrap) return;
+      const hires = matchingData.filter(m => m.procStatus === '최종합격');
+      if (!hires.length) {
+        wrap.innerHTML = '<div class="empty-state"><div class="empty-icon">🎉</div><div class="empty-text">최종합격자가 없습니다</div></div>';
+        return;
+      }
+      const byMonth = {};
+      hires.forEach(m => {
+        const ref = m.finalPassDate || m.date || '';
+        const ym = ref.slice(0, 7);
+        if (!ym) return;
+        if (!byMonth[ym]) byMonth[ym] = { count: 0, totalDays: 0, withDays: 0 };
+        byMonth[ym].count++;
+        const d = daysBetween(m.date, m.finalPassDate);
+        if (d != null) { byMonth[ym].totalDays += d; byMonth[ym].withDays++; }
+      });
+      const months = Object.keys(byMonth).sort().reverse().slice(0, 6);
+      wrap.innerHTML = months.map(ym => {
+        const v = byMonth[ym];
+        const avgDays = v.withDays ? Math.round(v.totalDays / v.withDays) : null;
+        return `<div class="flex items-center justify-between" style="padding:8px 0;border-bottom:1px solid #f0f0f0">
+      <span class="font-bold" style="font-size:13px">${ym}</span>
+      <div class="flex gap-16 text-sm text-gray">
+        <span>합격 ${v.count}명</span>
+        <span>평균 소요 ${avgDays != null ? avgDays + '일' : '—'}</span>
+      </div>
+    </div>`;
+      }).join('');
+    }
+
+    // ── Recruitment Funnel (역삼각형) ──
+    function renderDashFunnel() {
+      const wrap = document.getElementById('dash-funnel');
+      if (!wrap) return;
+      const stages = [
+        { label: '검토', count: matchingData.length },
+        { label: '과제/공통면접', count: matchingData.filter(m => ['과제/공통면접', '최종면접', '최종합격'].includes(m.procStatus)).length },
+        { label: '최종면접', count: matchingData.filter(m => ['최종면접', '최종합격'].includes(m.procStatus)).length },
+        { label: '최종합격', count: matchingData.filter(m => m.procStatus === '최종합격').length },
+      ];
+      const max = stages[0].count || 1;
+      const colors = ['#333', '#555', '#777', '#2a9a50'];
+      wrap.innerHTML = stages.map((s, i) => {
+        const widthPct = Math.max(10, Math.round((s.count / max) * 100));
+        return `<div style="margin:0 auto 8px;width:${widthPct}%;background:${colors[i]};color:#fff;border-radius:6px;padding:10px 12px;text-align:center;transition:width 0.2s">
+      <div style="font-size:12px;opacity:0.85">${escHtml(s.label)}</div>
+      <div style="font-size:18px;font-weight:700">${s.count}명</div>
+    </div>`;
+      }).join('');
+    }
+
+    // ── 소싱채널별 채용인원 ──
+    function renderDashChannelHires() {
+      const wrap = document.getElementById('dash-channel-hires');
+      if (!wrap) return;
+      const hires = matchingData.filter(m => m.procStatus === '최종합격');
+      const channels = ['온라인', '헤드헌터', '추천채용'];
+      const counts = channels.map(c => hires.filter(m => m.channel === c).length);
+      const unassigned = hires.filter(m => !channels.includes(m.channel)).length;
+      const rows = channels.map((c, i) => ({ label: c, count: counts[i] }));
+      if (unassigned) rows.push({ label: '미지정', count: unassigned });
+      if (!hires.length) {
+        wrap.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">최종합격자가 없습니다</div></div>';
+        return;
+      }
+      wrap.innerHTML = rows.map(r => `
+    <div class="flex items-center justify-between" style="padding:8px 0;border-bottom:1px solid #f0f0f0">
+      <span class="font-bold" style="font-size:13px">${escHtml(r.label)}</span>
+      <span class="text-sm text-gray">${r.count}명</span>
+    </div>`).join('');
     }
 
     let rptViewMode = 'list';
@@ -6042,8 +6160,13 @@ ${m.extractedText.substring(0, 3000)}
       if (!m) return;
       m.procStatus = status;
       if (status) m.rejected = false; // 상태 변경 시 불합격 해제
+      if (status === '최종합격') {
+        m.finalPassDate = new Date().toLocaleDateString('ko-KR',
+          { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace('.', '');
+      }
       saveData();
       filterMatching();
+      renderDashboard();
       const label = { '': '검토중', '과제/공통면접': '과제/공통면접 진행', '최종면접': '최종면접 진행', '최종합격': '최종합격' }[status] || status;
       showToast(`"${m.applicant}" 상태가 [${label}]로 변경되었습니다.`, 'success');
       if (currentPage === 'schedule') renderAssignList();
