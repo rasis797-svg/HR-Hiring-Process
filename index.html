@@ -118,6 +118,19 @@
           </svg>
           면접질문리포트
         </div>
+        <div class="nav-item" data-nav="mini-quest" onclick="nav('mini-quest')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2l3 6 6 1-4.5 4.5 1 6L12 17l-5.5 2.5 1-6L3 9l6-1z" />
+          </svg>
+          과제 면접
+        </div>
+        <div class="nav-item" data-nav="qq-results" onclick="nav('qq-results')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 11l3 3L22 4" />
+            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+          </svg>
+          과제 면접 결과
+        </div>
         <div class="nav-item" data-nav="core-interview" onclick="nav('core-interview')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
@@ -284,6 +297,7 @@
                   <th>지원자</th>
                   <th>상태</th>
                   <th>생성일</th>
+                  <th>채용완료일</th>
                   <th>보관장소</th>
                   <th></th>
                 </tr>
@@ -774,6 +788,7 @@
                 <option value="">전체 월</option>
               </select>
               <button class="btn btn-secondary btn-sm" onclick="resetRptFilters()">초기화</button>
+              <button id="rpt-exclude-btn" class="btn btn-secondary btn-sm" onclick="toggleRptExclude()">불합격/채용완료 제외</button>
               <span id="rpt-count-badge" class="text-sm text-gray" style="margin-left:auto"></span>
             </div>
           </div>
@@ -1229,6 +1244,68 @@
               <div id="backup-history-list"></div>
             </div>
           </div>
+        </div>
+
+        <!-- ── Mini Quest (Phase 5) Interview ── -->
+        <div class="page" id="page-mini-quest">
+          <div id="qq-root"></div>
+        </div>
+
+        <!-- ── Mini Quest Results ── -->
+        <div class="page" id="page-qq-results">
+          <div class="flex items-center justify-between mb-24">
+            <div>
+              <div class="page-title">과제 면접 결과 목록</div>
+              <div class="page-subtitle">저장된 과제(미니 퀘스트) 면접 평가 결과를 조회합니다</div>
+            </div>
+            <div class="flex gap-8">
+              <select id="qqr-filter-verdict" class="form-control" style="width:130px" onchange="renderQQResults()">
+                <option value="">전체 결과</option>
+                <option value="합격">합격</option>
+                <option value="불합격">불합격</option>
+              </select>
+              <button class="btn btn-danger btn-sm" onclick="clearAllQQResults()">전체 삭제</button>
+            </div>
+          </div>
+          <div id="qqr-stats" class="grid-4 mb-24"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>지원자</th>
+                  <th>포지션</th>
+                  <th>판정</th>
+                  <th>Red Flag</th>
+                  <th>평가일시</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="qqr-tbody">
+                <tr>
+                  <td colspan="6">
+                    <div class="empty-state">
+                      <div class="empty-icon">📋</div>
+                      <div class="empty-text">저장된 과제 면접 결과가 없습니다</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── Mini Quest Result Detail ── -->
+        <div class="page" id="page-qq-result-detail">
+          <div class="flex items-center gap-12 mb-8">
+            <button class="btn btn-secondary btn-sm" onclick="nav('qq-results')">← 목록</button>
+          </div>
+          <div class="flex items-center justify-between mb-24">
+            <div>
+              <div class="page-title" id="qqrd-title"></div>
+              <div class="page-subtitle" id="qqrd-subtitle"></div>
+            </div>
+          </div>
+          <div id="qqrd-body"></div>
         </div>
 
         <!-- ── Core Interview ── -->

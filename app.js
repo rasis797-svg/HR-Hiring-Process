@@ -15,6 +15,8 @@
 
       if (page === 'matching' || page === 'matching-upload') syncPositionDropdowns();
       if (page === 'core-interview') setTimeout(renderCI, 0);
+      if (page === 'mini-quest') setTimeout(renderQQ, 0);
+      if (page === 'qq-results') setTimeout(renderQQResults, 0);
       if (page === 'reports') setTimeout(renderReports, 0);
       if (page === 'dashboard') setTimeout(renderDashboard, 0);
       if (page === 'positions') setTimeout(renderPositions, 0);
@@ -27,6 +29,8 @@
         matching: 'matching', 'matching-upload': 'matching', 'match-result': 'matching',
         reports: 'reports', 'report-detail': 'reports',
         admin: 'admin', account: 'account',
+        'mini-quest': 'mini-quest',
+        'qq-results': 'qq-results', 'qq-result-detail': 'qq-results',
         'core-interview': 'core-interview',
         'ci-results': 'ci-results', 'ci-result-detail': 'ci-results',
         schedule: 'schedule'
@@ -1904,6 +1908,14 @@ ${m.extractedText.substring(0, 3000)}
     }
 
     let rptViewMode = 'list';
+    let rptExcludeDone = false;
+
+    function toggleRptExclude() {
+      rptExcludeDone = !rptExcludeDone;
+      const btn = document.getElementById('rpt-exclude-btn');
+      if (btn) btn.classList.toggle('btn-primary', rptExcludeDone);
+      renderReports();
+    }
 
     function setRptView(mode) {
       rptViewMode = mode;
@@ -1970,6 +1982,10 @@ ${m.extractedText.substring(0, 3000)}
       if (filterPos) rows = rows.filter(m => m.position === filterPos);
       if (filterYear) rows = rows.filter(m => (m.date || '').startsWith(filterYear));
       if (filterMonth) rows = rows.filter(m => (m.date || '').slice(5, 7) === filterMonth);
+      if (rptExcludeDone) {
+        const completedPos = new Set(sheetsData.filter(s => s.status === '채용완료').map(s => s.name));
+        rows = rows.filter(m => !m.rejected && !completedPos.has(m.position));
+      }
 
       // 카운트 배지
       const badge = document.getElementById('rpt-count-badge');
@@ -2052,7 +2068,10 @@ ${m.extractedText.substring(0, 3000)}
       </div>`).join('');
     }
 
-    // 연도/월별 그룹 렌더
+    // 연도/월별 그룹 렌더 (연/월 단위로 좌우 이동)
+    let rptPeriodYear = null;
+    let rptPeriodMonth = null;
+
     function renderRptGroupedByPeriod(rows) {
       const wrap = document.getElementById('rpt-view-grouped');
       if (!rows.length) { wrap.innerHTML = RPT_EMPTY; return; }
@@ -2064,25 +2083,60 @@ ${m.extractedText.substring(0, 3000)}
         if (!byYear[y][mo]) byYear[y][mo] = [];
         byYear[y][mo].push(m);
       });
-      wrap.innerHTML = Object.keys(byYear).sort().reverse().map(year => {
-        const total = Object.values(byYear[year]).reduce((s, a) => s + a.length, 0);
-        const moHtml = Object.keys(byYear[year]).sort().map(mo => `
-      <div style="margin-bottom:14px">
-        <div class="rpt-month-label">
-          📅 ${parseInt(mo)}월
-          <span class="badge badge-gray" style="font-size:10px">${byYear[year][mo].length}건</span>
-        </div>
-        ${rptMiniTable(byYear[year][mo])}
-      </div>`).join('');
-        return `
+
+      const years = Object.keys(byYear).sort();
+      if (!rptPeriodYear || !byYear[rptPeriodYear]) rptPeriodYear = years[years.length - 1];
+      const months = Object.keys(byYear[rptPeriodYear]).sort();
+      if (!rptPeriodMonth || !byYear[rptPeriodYear][rptPeriodMonth]) rptPeriodMonth = months[months.length - 1];
+
+      const yearIdx = years.indexOf(rptPeriodYear);
+      const monthIdx = months.indexOf(rptPeriodMonth);
+      const items = byYear[rptPeriodYear][rptPeriodMonth] || [];
+
+      wrap.innerHTML = `
       <div class="card mb-12">
         <div class="rpt-group-header">
-          <div class="section-title" style="margin-bottom:0">📆 ${year}년</div>
-          <span class="badge badge-gray">${total}건</span>
+          <div class="section-title" style="margin-bottom:0">📆 ${rptPeriodYear}년 📅 ${parseInt(rptPeriodMonth)}월</div>
+          <span class="badge badge-gray">${items.length}건</span>
         </div>
-        ${moHtml}
+        ${rptMiniTable(items)}
+        <div class="flex items-center justify-between mt-16" style="margin-top:16px">
+          <div class="flex gap-8">
+            <button class="btn btn-secondary btn-sm" ${yearIdx <= 0 ? 'disabled' : ''} onclick="rptNavPeriod('year',-1)">◀ 이전 연도</button>
+            <button class="btn btn-secondary btn-sm" ${yearIdx >= years.length - 1 ? 'disabled' : ''} onclick="rptNavPeriod('year',1)">다음 연도 ▶</button>
+          </div>
+          <div class="flex gap-8">
+            <button class="btn btn-secondary btn-sm" ${monthIdx <= 0 ? 'disabled' : ''} onclick="rptNavPeriod('month',-1)">◀ 이전 월</button>
+            <button class="btn btn-secondary btn-sm" ${monthIdx >= months.length - 1 ? 'disabled' : ''} onclick="rptNavPeriod('month',1)">다음 월 ▶</button>
+          </div>
+        </div>
       </div>`;
-      }).join('');
+    }
+
+    function rptNavPeriod(unit, dir) {
+      const allRows = matchingData.filter(m => m.reportData?.interview_questions);
+      const byYear = {};
+      allRows.forEach(m => {
+        const y = (m.date || '').slice(0, 4) || '미상';
+        const mo = (m.date || '').slice(5, 7) || '00';
+        if (!byYear[y]) byYear[y] = {};
+        if (!byYear[y][mo]) byYear[y][mo] = [];
+        byYear[y][mo].push(m);
+      });
+      const years = Object.keys(byYear).sort();
+      if (unit === 'year') {
+        const idx = years.indexOf(rptPeriodYear) + dir;
+        if (idx < 0 || idx >= years.length) return;
+        rptPeriodYear = years[idx];
+        const months = Object.keys(byYear[rptPeriodYear]).sort();
+        rptPeriodMonth = months[months.length - 1];
+      } else {
+        const months = Object.keys(byYear[rptPeriodYear] || {}).sort();
+        const idx = months.indexOf(rptPeriodMonth) + dir;
+        if (idx < 0 || idx >= months.length) return;
+        rptPeriodMonth = months[idx];
+      }
+      renderReports();
     }
 
     async function regenReport() {
@@ -2472,6 +2526,11 @@ ${m.extractedText.substring(0, 3000)}
 
     function setPositionStatus(idx, status) {
       sheetsData[idx].status = status;
+      if (status === '채용완료') {
+        sheetsData[idx].completedDate = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace('.', '');
+      } else {
+        sheetsData[idx].completedDate = '';
+      }
       saveData();
       renderPositions();
       renderDashboard();
@@ -2510,7 +2569,7 @@ ${m.extractedText.substring(0, 3000)}
 
       const tbody = document.getElementById('positions-tbody');
       if (sheetsData.length === 0) {
-        tbody.innerHTML = '<tr id="positions-empty"><td colspan="8"><div class="empty-state"><div class="empty-icon">💼</div><div class="empty-text">등록된 포지션이 없습니다. 설계시트를 생성하면 자동으로 포지션이 등록됩니다.</div></div></td></tr>';
+        tbody.innerHTML = '<tr id="positions-empty"><td colspan="9"><div class="empty-state"><div class="empty-icon">💼</div><div class="empty-text">등록된 포지션이 없습니다. 설계시트를 생성하면 자동으로 포지션이 등록됩니다.</div></div></td></tr>';
         return;
       }
 
@@ -2528,7 +2587,7 @@ ${m.extractedText.substring(0, 3000)}
       });
 
       if (rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">조건에 맞는 포지션이 없습니다.</div></div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">조건에 맞는 포지션이 없습니다.</div></div></td></tr>';
         return;
       }
 
@@ -2551,6 +2610,7 @@ ${m.extractedText.substring(0, 3000)}
         <button class="btn btn-secondary btn-sm" style="margin-left:6px;font-size:11px;padding:2px 8px" onclick="setPositionStatus(${i},'${nextVal}')">${nextStatus}</button>
       </td>
       <td class="text-gray text-sm">${s.created}</td>
+      <td class="text-gray text-sm">${escHtml(s.completedDate || '')}</td>
       <td>
         <input class="form-control form-control-sm" style="font-size:12px;padding:4px 6px;width:120px" value="${escHtml(s.storageLocation || '')}" placeholder="예: 인사팀 서버 3층" onchange="updatePositionStorage(${i}, this.value)" />
       </td>
@@ -3036,6 +3096,75 @@ ${m.extractedText.substring(0, 3000)}
       { id: 5, label: '5-Star 게임 체인저', desc: '동 레벨이 아닌 상위 레벨의 스타플레이어와 비교하여도 부족하지 않은 지식과 기술을 보유한다고 판단한 경우' },
     ];
 
+    // ══════════════════════════════════════════════════
+    //  과제(미니 퀘스트) 면접 평가 — Phase 5
+    // ══════════════════════════════════════════════════
+
+    const RED_FLAG_TYPES = ['감정적 방어기제', '맹목적 수용', '환경/조건 탓'];
+
+    const MINI_QUEST_QB = [
+      {
+        id: 'Q1', group: '사고 과정과 설계 로직 해부', axis: '사고로직', label: '가설과 문제 정의', type: 'standard',
+        question: '이 과제를 처음 받았을 때, 지원자님이 가장 먼저 세웠던 "핵심 문제"나 "가설"은 무엇이었습니까? 왜 다른 방식이 아닌, 그 관점에서 출발하셨습니까?',
+        criteria: {
+          gold: ['본인만의 명확한 가설과 그 관점을 택한 논리적 이유를 제시 (SME 확정 필요)'],
+          red: ['가설 없이 직감/짜깁기, "그냥 주어진 대로" (SME 확정 필요)'],
+        },
+      },
+      {
+        id: 'Q2', group: '사고 과정과 설계 로직 해부', axis: '사고로직', label: '의사결정 대안', type: 'standard',
+        question: '이 결과물을 도출하는 과정에서 가장 치열하게 고민했던 두 가지 선택지(대안)는 무엇이었습니까? 왜 최종적으로 지금의 안을 선택하셨습니까?',
+        criteria: {
+          gold: ['대안 간 트레이드오프와 \'포기한 가치\'를 명확히 설명 (SME 확정 필요)'],
+          red: ['대안을 제시하지 못하거나 선택 이유가 부재 (SME 확정 필요)'],
+        },
+      },
+      {
+        id: 'Q3', group: '사고 과정과 설계 로직 해부', axis: '사고로직', label: '데이터와 근거', type: 'standard',
+        question: '이 결론(또는 구조)을 뒷받침하기 위해 가장 핵심적으로 신뢰했던 데이터(또는 기준/레퍼런스)는 무엇입니까? 왜 그것이 유효하다고 판단하셨습니까?',
+        criteria: {
+          gold: ['근거의 유효성을 스스로 검증한 논리 제시 (SME 확정 필요)'],
+          red: ['근거 없는 단정, 출처 불명 (SME 확정 필요)'],
+        },
+      },
+      {
+        id: 'Q4', group: '제약 시뮬레이션', axis: '사고로직', label: '자원 축소 방어전', type: 'standard',
+        question: '실전 투입 시 예산(혹은 시간)이 현재의 절반으로 깎인다면, 지금 결과물에서 가장 먼저 버릴 것과 끝까지 사수할 핵심은 각각 무엇입니까?',
+        criteria: {
+          gold: ['우선순위 판단 + 본질(사수 가치) 분리 능력 (SME 확정 필요)'],
+          red: ['환경·조건 탓("그 예산으론 불가능"), 우선순위 부재 (SME 확정 필요)'],
+        },
+      },
+      {
+        id: 'Q5', group: '제약 시뮬레이션', axis: '사고로직', label: '약점의 객관화', type: 'standard',
+        question: '본인이 설계한 결과물에서 실무 적용 시 터질 수 있는 가장 치명적인 리스크/취약점 딱 한 가지를 꼽는다면?',
+        criteria: {
+          gold: ['자기 결과물의 약점을 솔직·정확히 객관화 (SME 확정 필요)'],
+          red: ['약점 부정/방어("문제없습니다"), 회피 (SME 확정 필요)'],
+        },
+      },
+      {
+        id: 'Q6', group: '직급별 지식 및 기술 검증', axis: '지식기술', label: '직군별 필수 지식/기술', type: 'custom',
+        question: '', criteria: { gold: [], red: [] },
+      },
+      {
+        id: 'Q7', group: '메타 인지', axis: '협업태도', label: '협업 검증 (의도적 반박 시뮬레이션)', type: 'rebuttal_sim',
+        question: '제가 보기엔 이 방식보다 기존의 OOO 방식이 훨씬 효율적일 것 같은데, 어떻게 생각하십니까?',
+        criteria: {
+          gold: ['감정적으로 흔들리지 않고 근거로 차분히 방어/수정, 타당하면 수용 (SME 확정 필요)'],
+          red: ['감정적 방어기제 / 맹목적 수용 / 환경·조건 탓 — 3종 중 발현 여부로 판단'],
+        },
+      },
+      {
+        id: 'Q8', group: '메타 인지', axis: '협업태도', label: '자체 회고와 재설계', type: 'standard',
+        question: '제출 후 다시 보며 \'이 부분은 잘못 짚었구나\' 혹은 \'이렇게 바꿀 걸\' 후회한 지점이 있습니까? 3일이 더 주어진다면 어디를 가장 먼저 고도화하시겠습니까?',
+        criteria: {
+          gold: ['\'나의 판단/방법론\'을 회고 대상에 포함, 구체적 고도화안 제시 (SME 확정 필요)'],
+          red: ['외부 귀인만, "바꿀 게 없다", 환경·조건 탓 (SME 확정 필요)'],
+        },
+      },
+    ];
+
     let ci = null; // current interview session
 
     function ciNav() { nav('core-interview'); renderCI(); }
@@ -3476,7 +3605,7 @@ ${m.extractedText.substring(0, 3000)}
     <div class="ci-flag-row">
       <span class="badge badge-red">${rf.id}</span>
       <span style="font-size:13px">${escHtml(rf.label)}</span>
-      ${rf.memo ? `<span class="text-gray text-sm">— ${escHtml(rf.memo.substring(0, 40))}</span>` : ''}
+      ${rf.memo ? `<span class="text-gray text-sm">— ${escHtml(rf.memo)}</span>` : ''}
     </div>`).join('') || '<div class="text-gray text-sm">Red Flag 없음</div>';
 
       let qSummary = ci.questions.map(q => {
@@ -3526,7 +3655,7 @@ ${m.extractedText.substring(0, 3000)}
   </div>
   <div class="card">
     <div class="section-title mb-12">종합 의견</div>
-    <textarea id="ci-opinion" class="form-control" rows="5" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(ci.opinion || '')}</textarea>
+    <textarea id="ci-opinion" class="form-control" rows="10" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(ci.opinion || '')}</textarea>
     <div class="text-sm text-gray" style="margin-top:6px">※ "💾 결과 저장" 시 함께 저장됩니다.</div>
   </div>
   ${renderCIStarSection(ci.starLevel, ci.starMemo)}`;
@@ -3551,7 +3680,7 @@ ${m.extractedText.substring(0, 3000)}
     ${boxes}
     <div style="margin-top:16px">
       <label class="form-label">메모</label>
-      <textarea id="ci-star-memo" class="form-control" rows="4" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요." onchange="ciSaveStarMemo(this.value)">${escHtml(memo || '')}</textarea>
+      <textarea id="ci-star-memo" class="form-control" rows="10" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요." onchange="ciSaveStarMemo(this.value)">${escHtml(memo || '')}</textarea>
       <div class="text-sm text-gray" style="margin-top:6px">※ "💾 결과 저장" 시 등급과 메모가 함께 저장됩니다.</div>
     </div>
   </div>`;
@@ -4030,7 +4159,7 @@ ${m.extractedText.substring(0, 3000)}
     <div class="flex items-center gap-8 mb-8">
       <span class="badge badge-red">${escHtml(rf.id)}</span>
       <span class="text-sm">${escHtml(rf.label || rf.id)}</span>
-      ${rf.memo ? `<span class="text-gray text-sm">— ${escHtml(rf.memo.substring(0, 60))}</span>` : ''}
+      ${rf.memo ? `<span class="text-gray text-sm">— ${escHtml(rf.memo)}</span>` : ''}
     </div>`).join('') || '<p class="text-gray text-sm">Red Flag 없음</p>';
 
       // 질문별 요약 (results 객체 기반)
@@ -4039,27 +4168,30 @@ ${m.extractedText.substring(0, 3000)}
       const qSummary = qKeys.length
         ? qKeys.map(qId => {
           const res = results[qId];
-          const mFlag = res.mainFlag || '미평가';
-          const fCls = mFlag === 'green' ? 'badge-green' : mFlag === 'red' ? 'badge-red' : 'badge-gray';
-          const fTx = mFlag === 'green' ? '✅ Green' : mFlag === 'red' ? '🚨 Red Flag' : '미평가';
+          const mFlag = res.mainFlag || '';
           const subItems = Object.entries(res.subs || {}).map(([sid, sv]) => {
-            const sf = sv.status === 'skip' ? '스킵' : sv.flag || '미평가';
-            const sc = sf === 'green' ? 'text-green' : sf === 'red' ? 'text-red' : 'text-gray';
-            return `<div style="padding:6px 0 6px 16px;border-bottom:1px solid #f8f8f8;display:flex;align-items:flex-start;gap:8px">
-            <span style="font-size:11px;background:#f0f0f0;color:#555;padding:1px 6px;border-radius:3px;flex-shrink:0;margin-top:1px">${sid}</span>
-            <div style="flex:1">
-              <span class="text-sm ${sc} font-bold">${sf === 'green' ? '✅ Green' : sf === 'red' ? '🚨 Red' : sf}</span>
-              ${sv.memo ? `<span class="text-gray text-sm" style="margin-left:8px">${escHtml(sv.memo.substring(0, 60))}</span>` : ''}
-              ${sv.reason ? `<div style="font-size:11px;color:#aaa;margin-top:2px">스킵 사유: ${escHtml(sv.reason)}</div>` : ''}
+            const skip = sv.status === 'skip';
+            const sf = sv.flag || '';
+            return `<div style="padding:8px 0 8px 16px;border-bottom:1px solid #f8f8f8;display:flex;flex-direction:column;gap:6px">
+            <div class="flex items-center gap-8">
+              <span style="font-size:11px;background:#f0f0f0;color:#555;padding:1px 6px;border-radius:3px;flex-shrink:0">${sid}</span>
+              ${skip ? '<span class="badge badge-gray" style="font-size:11px">스킵</span>' : `
+              <button class="ci-btn-g${sf === 'green' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="cirdSetFlag(${idx},'${qId}','${sid}','green')">✅ Green</button>
+              <button class="ci-btn-r${sf === 'red' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="cirdSetFlag(${idx},'${qId}','${sid}','red')">🚨 Red</button>`}
+              ${sv.reason ? `<span style="font-size:11px;color:#aaa">스킵 사유: ${escHtml(sv.reason)}</span>` : ''}
             </div>
+            ${!skip ? `<textarea class="form-control" style="font-size:12px" rows="2" placeholder="메모..." onchange="cirdSaveMemo(${idx},'${qId}','${sid}',this.value)">${escHtml(sv.memo || '')}</textarea>` : ''}
           </div>`;
           }).join('');
           return `<div class="card mb-8" style="padding:0;overflow:hidden">
-          <div style="background:#f8f8f8;padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #eee">
-            <span class="badge badge-gray" style="font-size:11px">${qId}</span>
-            <span class="font-bold" style="font-size:13px">메인 질문</span>
-            <span class="badge ${fCls}" style="font-size:11px">${fTx}</span>
-            ${res.mainMemo ? `<span class="text-gray text-sm" style="margin-left:auto;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(res.mainMemo)}</span>` : ''}
+          <div style="background:#f8f8f8;padding:10px 16px;border-bottom:1px solid #eee">
+            <div class="flex items-center gap-8 mb-8">
+              <span class="badge badge-gray" style="font-size:11px">${qId}</span>
+              <span class="font-bold" style="font-size:13px">메인 질문</span>
+              <button class="ci-btn-g${mFlag === 'green' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="cirdSetFlag(${idx},'${qId}','main','green')">✅ Green</button>
+              <button class="ci-btn-r${mFlag === 'red' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="cirdSetFlag(${idx},'${qId}','main','red')">🚨 Red Flag</button>
+            </div>
+            <textarea class="form-control" style="font-size:12px" rows="2" placeholder="메모..." onchange="cirdSaveMemo(${idx},'${qId}','main',this.value)">${escHtml(res.mainMemo || '')}</textarea>
           </div>
           ${subItems}
         </div>`;
@@ -4094,7 +4226,7 @@ ${m.extractedText.substring(0, 3000)}
         <div class="section-title">종합 의견</div>
         <button class="btn btn-primary btn-sm" onclick="saveCIOpinion(${idx})">저장</button>
       </div>
-      <textarea id="cird-opinion" class="form-control" rows="5" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(r.opinion || '')}</textarea>
+      <textarea id="cird-opinion" class="form-control" rows="10" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(r.opinion || '')}</textarea>
     </div>
     <div class="card mt-16" style="margin-top:16px">
       <div class="flex items-center justify-between mb-12">
@@ -4112,11 +4244,44 @@ ${m.extractedText.substring(0, 3000)}
       </div>`).join('')}
       <div style="margin-top:16px">
         <label class="form-label">메모</label>
-        <textarea id="cird-star-memo" class="form-control" rows="4" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요.">${escHtml(r.starMemo || '')}</textarea>
+        <textarea id="cird-star-memo" class="form-control" rows="10" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요.">${escHtml(r.starMemo || '')}</textarea>
       </div>
     </div>
   `;
       nav('ci-result-detail');
+    }
+
+    function cirdSetFlag(idx, qId, subKey, flag) {
+      const all = loadCIResults();
+      const r = all[idx];
+      if (!r) return;
+      r.results = r.results || {};
+      r.results[qId] = r.results[qId] || {};
+      if (subKey === 'main') {
+        r.results[qId].mainFlag = r.results[qId].mainFlag === flag ? '' : flag;
+      } else {
+        r.results[qId].subs = r.results[qId].subs || {};
+        r.results[qId].subs[subKey] = r.results[qId].subs[subKey] || {};
+        r.results[qId].subs[subKey].flag = r.results[qId].subs[subKey].flag === flag ? '' : flag;
+      }
+      localStorage.setItem('wm_ci_results', JSON.stringify(all));
+      openCIResultDetail(idx);
+    }
+
+    function cirdSaveMemo(idx, qId, subKey, value) {
+      const all = loadCIResults();
+      const r = all[idx];
+      if (!r) return;
+      r.results = r.results || {};
+      r.results[qId] = r.results[qId] || {};
+      if (subKey === 'main') {
+        r.results[qId].mainMemo = value;
+      } else {
+        r.results[qId].subs = r.results[qId].subs || {};
+        r.results[qId].subs[subKey] = r.results[qId].subs[subKey] || {};
+        r.results[qId].subs[subKey].memo = value;
+      }
+      localStorage.setItem('wm_ci_results', JSON.stringify(all));
     }
 
     function cirdSetStarLevel(idx, level) {
@@ -4231,6 +4396,734 @@ ${m.extractedText.substring(0, 3000)}
       const win = window.open('', '_blank');
       win.document.write(html);
       win.document.close();
+    }
+
+    // ══════════════════════════════════════════════════
+    //  과제(미니 퀘스트) 면접 — 세션/판정/결과 로직
+    // ══════════════════════════════════════════════════
+
+    let qq = null; // current mini-quest session
+
+    function renderQQ() {
+      const root = document.getElementById('qq-root');
+      if (!root) return;
+      if (!qq) {
+        root.innerHTML = renderQQStart();
+        return;
+      }
+      if (qq.done) { root.innerHTML = renderQQResult(); return; }
+      root.innerHTML = renderQQSession();
+    }
+
+    // ── 시작 화면 ──
+    function renderQQStart() {
+      const positions = [...new Set(matchingData.map(m => m.position))].filter(Boolean);
+      const posCards = positions.length
+        ? positions.map(p => {
+          const count = matchingData.filter(m => m.position === p).length;
+          return `<div class="ci-pos-card" id="qqpc-${escHtml(p)}" onclick="qqSelectPos('${p.replace(/'/g, "\\'")}')">
+          <div class="ci-pos-card-name">${escHtml(p)}</div>
+          <div class="ci-pos-card-cnt">지원자 ${count}명</div>
+        </div>`;
+        }).join('')
+        : `<div style="font-size:13px;color:#aaa;padding:20px 0;text-align:center">등록된 포지션이 없습니다.<br>매칭 분석에서 지원자를 먼저 추가하세요.</div>`;
+
+      return `
+  <div class="flex items-center justify-between mb-24">
+    <div>
+      <div class="page-title">과제(미니 퀘스트) 면접 평가</div>
+      <div class="page-subtitle">Phase 5 — Red Flag 1개 발생 시 즉시 불합격 (Hard Stop)</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+    <div class="card" style="padding:20px">
+      <div class="section-title mb-4">포지션 선택</div>
+      <div class="text-sm text-gray mb-16">면접을 진행할 포지션을 선택하세요</div>
+      <div id="qq-pos-list" style="display:flex;flex-direction:column;gap:8px">
+        ${posCards}
+      </div>
+    </div>
+    <div class="card" style="padding:20px">
+      <div class="section-title mb-4">면접 설정</div>
+      <div class="text-sm text-gray mb-16">지원자를 설정하세요</div>
+      <div id="qq-selected-pos-badge" style="display:none;margin-bottom:16px">
+        <span style="font-size:12px;color:#888">선택된 포지션</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;padding:8px 12px;background:#f5f5f5;border-radius:6px">
+          <span id="qq-selected-pos-name" style="font-weight:700;font-size:14px"></span>
+          <button onclick="qqClearPos()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:16px;line-height:1">×</button>
+        </div>
+      </div>
+      <div class="form-group mb-12">
+        <label class="form-label">지원자 선택 <span class="required">*</span></label>
+        <select id="qq-applicant-sel" class="form-control">
+          <option value="">포지션을 먼저 선택하세요</option>
+        </select>
+      </div>
+      <div class="form-group mb-12" id="qq-manual-row" style="display:none">
+        <label class="form-label">직접 입력</label>
+        <div class="form-row">
+          <input id="qq-name-manual" class="form-control" placeholder="지원자명" />
+          <input id="qq-pos-manual"  class="form-control" placeholder="포지션명" />
+        </div>
+      </div>
+      <div style="margin-bottom:20px">
+        <a class="link" onclick="qqToggleManual()" style="font-size:13px">✏️ 직접 입력하기</a>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="qqStart()">면접 시작</button>
+    </div>
+  </div>`;
+    }
+
+    function qqSelectPos(pos) {
+      document.querySelectorAll('#qq-pos-list .ci-pos-card').forEach(c => c.classList.remove('active'));
+      const card = document.getElementById(`qqpc-${pos}`);
+      if (card) card.classList.add('active');
+      const badge = document.getElementById('qq-selected-pos-badge');
+      const name = document.getElementById('qq-selected-pos-name');
+      if (badge) badge.style.display = '';
+      if (name) name.textContent = pos;
+      qqUpdateApplicants(pos);
+    }
+
+    function qqClearPos() {
+      document.querySelectorAll('#qq-pos-list .ci-pos-card').forEach(c => c.classList.remove('active'));
+      const badge = document.getElementById('qq-selected-pos-badge');
+      if (badge) badge.style.display = 'none';
+      const sel = document.getElementById('qq-applicant-sel');
+      if (sel) sel.innerHTML = '<option value="">포지션을 먼저 선택하세요</option>';
+    }
+
+    function qqUpdateApplicants(pos) {
+      const sel = document.getElementById('qq-applicant-sel');
+      if (!sel) return;
+      const applicants = matchingData.filter(m => m.position === pos);
+      if (!pos || applicants.length === 0) {
+        sel.innerHTML = '<option value="">해당 포지션 지원자 없음</option>';
+        return;
+      }
+      sel.innerHTML = '<option value="">지원자를 선택하세요</option>' +
+        applicants.map(m => {
+          const realIdx = matchingData.indexOf(m);
+          return `<option value="${realIdx}">${escHtml(m.applicant)} (${m.score}/5 · ${m.date})</option>`;
+        }).join('');
+    }
+
+    function qqToggleManual() {
+      const row = document.getElementById('qq-manual-row');
+      const appRow = document.getElementById('qq-applicant-sel')?.closest('.form-group');
+      if (!row) return;
+      const showing = row.style.display !== 'none';
+      row.style.display = showing ? 'none' : '';
+      if (appRow) appRow.style.display = showing ? '' : 'none';
+    }
+
+    function qqStart() {
+      const manualVisible = document.getElementById('qq-manual-row')?.style.display !== 'none';
+      let name, pos;
+      if (manualVisible) {
+        name = document.getElementById('qq-name-manual')?.value.trim();
+        pos = document.getElementById('qq-pos-manual')?.value.trim();
+      } else {
+        const appIdx = parseInt(document.getElementById('qq-applicant-sel')?.value);
+        const m = isNaN(appIdx) ? null : matchingData[appIdx];
+        name = m?.applicant;
+        pos = m?.position || document.getElementById('qq-selected-pos-name')?.textContent || '';
+      }
+      if (!name || !pos) { showToast('포지션과 지원자를 선택하거나 직접 입력하세요.', 'error'); return; }
+      qq = {
+        name, pos,
+        questions: JSON.parse(JSON.stringify(MINI_QUEST_QB)),
+        qIdx: 0,
+        results: {},   // {qId: {judgment, redFlagType, memo, status}}
+        failed: false, failQ: null, failType: null,
+        opinion: '',
+        done: false,
+      };
+      renderQQ();
+    }
+
+    // ── 세션 화면 ──
+    function renderQQSession() {
+      const totalSteps = qq.questions.length;
+      const pct = Math.round(((qq.qIdx) / totalSteps) * 100);
+      const q = qq.questions[qq.qIdx];
+      const res = qq.results[q.id] || {};
+
+      const banner = qq.failed ? `
+    <div class="qq-fail-banner">⛔ 불합격 확정 — Red Flag 발생 (${qq.failQ}${qq.failType ? ' · ' + qq.failType : ''})</div>` : '';
+
+      const listHtml = buildQQList();
+
+      return `
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <div class="page-title">과제 면접 — ${escHtml(qq.name)}</div>
+      <div class="page-subtitle">${escHtml(qq.pos)} · 과제 면접</div>
+    </div>
+    <button class="btn btn-danger btn-sm" onclick="qqEndConfirm()">면접 종료</button>
+  </div>
+  ${banner}
+  <div class="ci-shell">
+    <div class="ci-progress"><div class="ci-progress-fill" style="width:${pct}%"></div></div>
+    <div class="ci-tree-layout">
+      <div class="ci-tree-panel">
+        <div class="ci-tree-panel-title">질문 목록 (${qq.qIdx + 1}/${totalSteps})</div>
+        ${listHtml}
+      </div>
+      <div class="ci-content-panel">
+        ${renderQQQuestion(q, res)}
+        <div class="ci-nav-row">
+          <button class="btn btn-secondary btn-sm" onclick="qqPrev()">← 이전</button>
+          <span class="ci-step-txt">${qq.qIdx + 1} / ${totalSteps}</span>
+          <button class="btn btn-primary btn-sm" onclick="qqNext()">다음 →</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+    }
+
+    function buildQQList() {
+      return qq.questions.map((q, qi) => {
+        const res = qq.results[q.id] || {};
+        const j = res.judgment || '';
+        const isActive = qq.qIdx === qi;
+        let cls = 'ci-tree-q-head';
+        if (isActive) cls += ' ci-tree-active';
+        else if (j === 'gold') cls += ' ci-tree-gold';
+        else if (j === 'ok') cls += ' ci-tree-green';
+        else if (j === 'red') cls += ' ci-tree-red';
+        const dot = j === 'gold' ? 'gold' : j === 'ok' ? 'green' : j === 'red' ? 'red' : '';
+        return `<div class="ci-tree-q">
+      <div class="${cls}" onclick="qqJumpTo(${qi})">
+        <div class="ci-tree-dot ${dot}"></div>
+        <span>${q.id}</span>
+        <span>${escHtml(q.label)}</span>
+      </div>
+    </div>`;
+      }).join('');
+    }
+
+    function qqJumpTo(qIdx) {
+      qq.qIdx = qIdx;
+      renderQQ();
+    }
+
+    function qqEndConfirm() {
+      const q6 = qq.questions.find(x => x.id === 'Q6');
+      if (q6 && !q6.question.trim()) {
+        const proceed = confirm('Q6(직군별 필수 지식/기술) 질문이 입력되지 않았습니다.\n그대로 면접을 종료하시겠습니까?');
+        if (!proceed) return;
+      }
+      const confirmed = confirm('면접을 종료하고 평가표를 확인하시겠습니까?\n미진행 항목은 "미진행"으로 처리됩니다.');
+      if (confirmed) {
+        qq.done = true;
+        renderQQ();
+      }
+    }
+
+    // ── 질문 화면 (메인 콘텐츠) ──
+    function renderQQQuestion(q, res) {
+      const skip = res.status === 'skip';
+      const axisBadge = `<span class="badge badge-gray" style="font-size:11px">${escHtml(q.axis)}</span>`;
+      let html = `
+    <div class="ci-q-label">
+      <span class="ci-q-code">${q.id}</span>
+      <span class="ci-q-cat">${escHtml(q.group)}</span>
+      ${axisBadge}
+    </div>`;
+
+      if (q.type === 'custom') {
+        html += `
+    <div class="form-group mb-12">
+      <label class="form-label">질문 (직군별 직접 입력) <span class="required">*</span></label>
+      <textarea class="form-control" rows="2" placeholder="이 포지션의 레벨별 필수 지식/기술을 검증할 질문을 입력하세요." onchange="qqSetQ6Field('question', this.value)">${escHtml(q.question || '')}</textarea>
+    </div>
+    <div class="form-row mb-12">
+      <div class="form-group" style="flex:1">
+        <label class="form-label">🏅 Gold Flag 기준</label>
+        <textarea class="form-control" rows="2" placeholder="Gold Flag로 판단할 기준" onchange="qqSetQ6Field('goldCriteria', this.value)">${escHtml((q.criteria.gold || [])[0] || '')}</textarea>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">🚨 Red Flag 기준</label>
+        <textarea class="form-control" rows="2" placeholder="Red Flag로 판단할 기준" onchange="qqSetQ6Field('redCriteria', this.value)">${escHtml((q.criteria.red || [])[0] || '')}</textarea>
+      </div>
+    </div>`;
+      } else {
+        html += `<div class="ci-script">${escHtml(q.question)}</div>`;
+        if (q.type === 'rebuttal_sim') {
+          html += `<div class="ci-q7-track">
+        <div class="ci-q7-track-title">의도적 반박 시뮬레이션 — Red Flag 3종 중 택1 태깅</div>
+        <div class="text-sm text-gray">감정적 방어기제 / 맹목적 수용 / 환경·조건 탓 중 어떤 반응이 나타나는지 관찰하세요.</div>
+      </div>`;
+        }
+        html += `
+    <div class="ci-hint-row">
+      <div class="ci-hint ci-hint-g">🏅 Gold Flag: ${(q.criteria.gold || []).map(escHtml).join(' / ') || '—'}</div>
+      <div class="ci-hint ci-hint-r">🚨 Red Flag: ${(q.criteria.red || []).map(escHtml).join(' / ') || '—'}</div>
+    </div>`;
+      }
+
+      html += `<div class="ci-skip-toggle">
+    <button class="ci-skip-opt${!skip ? ' on-p' : ''}" onclick="qqProceed('${q.id}',false)">▶ 진행 (Proceed)</button>
+    <button class="ci-skip-opt${skip ? ' on-s' : ''}" onclick="qqProceed('${q.id}',true)">⏭ 미진행 (Skip)</button>
+  </div>`;
+
+      if (!skip) {
+        html += `<textarea class="ci-memo" placeholder="면접관 메모..." onchange="qqSaveMemo('${q.id}',this.value)">${escHtml(res.memo || '')}</textarea>`;
+        html += `<div class="ci-flag-row">
+      <button class="ci-btn-gold${res.judgment === 'gold' ? ' sel' : ''}" onclick="qqSetJudgment('${q.id}','gold')">🏅 Gold Flag</button>
+      <button class="ci-btn-g${res.judgment === 'ok' ? ' sel' : ''}" onclick="qqSetJudgment('${q.id}','ok')">✅ 양호</button>
+      <button class="ci-btn-r${res.judgment === 'red' ? ' sel' : ''}" onclick="qqSetJudgment('${q.id}','red')">🚨 Red Flag</button>
+    </div>`;
+        if (res.judgment === 'red') {
+          html += `<div class="ci-skip-box">
+        <label>Red Flag 유형 선택 (필수)</label>
+        <select class="form-control" onchange="qqSetRedFlagType('${q.id}', this.value)">
+          <option value="">-- 유형 선택 --</option>
+          ${RED_FLAG_TYPES.map(t => `<option value="${escHtml(t)}"${res.redFlagType === t ? ' selected' : ''}>${escHtml(t)}</option>`).join('')}
+        </select>
+      </div>`;
+        }
+      }
+
+      return html;
+    }
+
+    function qqEnsureRes(qId) {
+      if (!qq.results[qId]) qq.results[qId] = { judgment: '', redFlagType: '', memo: '', status: 'proceed' };
+      return qq.results[qId];
+    }
+
+    function qqProceed(qId, skip) {
+      const res = qqEnsureRes(qId);
+      res.status = skip ? 'skip' : 'proceed';
+      renderQQ();
+    }
+
+    function qqSaveMemo(qId, val) {
+      const res = qqEnsureRes(qId);
+      res.memo = val;
+    }
+
+    function qqSetQ6Field(field, val) {
+      const q6 = qq.questions.find(x => x.id === 'Q6');
+      if (!q6) return;
+      if (field === 'question') q6.question = val;
+      else if (field === 'goldCriteria') q6.criteria.gold = val ? [val] : [];
+      else if (field === 'redCriteria') q6.criteria.red = val ? [val] : [];
+    }
+
+    function qqSetJudgment(qId, judgment) {
+      const res = qqEnsureRes(qId);
+      if (judgment === 'red') {
+        const confirmed = confirm(`⚠️ Red Flag를 표시하시겠습니까?\nPhase 5는 Red Flag 1개 발생 시 즉시 불합격(Hard Stop) 처리됩니다.\n\n항목: ${qId}`);
+        if (!confirmed) return;
+        if (!qq.failed) {
+          qq.failed = true;
+          qq.failQ = qId;
+          qq.failType = res.redFlagType || '';
+        }
+      } else if (res.judgment === 'red' && qq.failQ === qId) {
+        // 이미 확정된 첫 Red Flag를 되돌리는 경우 — 다른 질문 중 Red가 남아있는지 재확인
+        const stillRed = Object.entries(qq.results).find(([id, r]) => id !== qId && r.judgment === 'red');
+        if (!stillRed) { qq.failed = false; qq.failQ = null; qq.failType = null; }
+      }
+      res.judgment = judgment;
+      renderQQ();
+    }
+
+    function qqSetRedFlagType(qId, type) {
+      const res = qqEnsureRes(qId);
+      res.redFlagType = type;
+      if (qq.failQ === qId) qq.failType = type;
+      renderQQ();
+    }
+
+    function qqNext() {
+      if (qq.qIdx < qq.questions.length - 1) qq.qIdx++;
+      renderQQ();
+    }
+
+    function qqPrev() {
+      if (qq.qIdx > 0) qq.qIdx--;
+      renderQQ();
+    }
+
+    function qqGoBackToEdit() {
+      qq.done = false;
+      qq.qIdx = qq.questions.length - 1;
+      renderQQ();
+    }
+
+    // ── 결과 화면 (평가표) ──
+    function qqAxisSummary() {
+      const axes = ['사고로직', '지식기술', '협업태도'];
+      return axes.map(axis => {
+        const qs = qq.questions.filter(q => q.axis === axis);
+        const counts = { gold: 0, ok: 0, red: 0, skip: 0, none: 0 };
+        qs.forEach(q => {
+          const r = qq.results[q.id] || {};
+          if (r.status === 'skip') counts.skip++;
+          else if (r.judgment === 'gold') counts.gold++;
+          else if (r.judgment === 'ok') counts.ok++;
+          else if (r.judgment === 'red') counts.red++;
+          else counts.none++;
+        });
+        return { axis, ...counts, total: qs.length };
+      });
+    }
+
+    function renderQQResult() {
+      const isFail = qq.failed;
+      const verdict = isFail ? '불합격 (Drop)' : '합격 — Phase 6 이관 대상';
+      const vClass = isFail ? 'ci-result-fail' : 'ci-result-pass';
+
+      const axisRows = qqAxisSummary().map(a => `
+    <div class="flex items-center justify-between" style="padding:8px 0;border-bottom:1px solid #f0f0f0">
+      <span class="font-bold" style="font-size:13px">${escHtml(a.axis)}</span>
+      <div class="flex gap-8" style="font-size:12px">
+        <span style="color:#c98a00">🏅 ${a.gold}</span>
+        <span class="text-green">✅ ${a.ok}</span>
+        <span class="text-red">🚨 ${a.red}</span>
+        <span class="text-gray">⏭ ${a.skip}</span>
+      </div>
+    </div>`).join('');
+
+      const goldList = qq.questions.filter(q => (qq.results[q.id] || {}).judgment === 'gold');
+      const goldHtml = goldList.length
+        ? goldList.map(q => `<div class="flex items-center gap-8 mb-8"><span class="badge badge-gray" style="font-size:11px">${q.id}</span><span class="text-sm">${escHtml(q.label)}</span></div>`).join('')
+        : '<div class="text-gray text-sm">Gold Flag 없음</div>';
+
+      const redQ = qq.questions.find(q => q.id === qq.failQ);
+      const redHtml = isFail
+        ? `<div class="flex items-center gap-8 mb-8">
+        <span class="badge badge-red">${escHtml(qq.failQ || '')}</span>
+        <span class="text-sm">${escHtml(redQ?.label || '')}</span>
+      </div>
+      <div class="text-sm text-gray">유형: ${escHtml(qq.failType || '미지정')}</div>
+      <div class="text-sm text-gray mt-4" style="margin-top:4px">메모: ${escHtml((qq.results[qq.failQ] || {}).memo || '—')}</div>`
+        : '<div class="text-gray text-sm">Red Flag 없음</div>';
+
+      const qSummary = qq.questions.map(q => {
+        const r = qq.results[q.id] || {};
+        const skip = r.status === 'skip';
+        const j = r.judgment || '';
+        const jTx = j === 'gold' ? '🏅 Gold Flag' : j === 'ok' ? '✅ 양호' : j === 'red' ? '🚨 Red Flag' : '미평가';
+        const jCls = j === 'gold' ? 'badge-gray' : j === 'ok' ? 'badge-green' : j === 'red' ? 'badge-red' : 'badge-gray';
+        return `<div style="padding:10px 0;border-bottom:1px solid #f0f0f0">
+      <div class="flex items-center gap-8 mb-4">
+        <span class="badge badge-gray" style="font-size:11px">${q.id}</span>
+        <span style="font-size:13px;font-weight:500">${escHtml(q.label)}</span>
+        <span class="badge ${jCls}" style="font-size:11px">${skip ? '⏭ 미진행' : jTx}</span>
+      </div>
+      ${!skip && r.memo ? `<div class="text-gray text-sm">${escHtml(r.memo)}</div>` : ''}
+    </div>`;
+      }).join('');
+
+      return `
+  <div class="flex items-center justify-between mb-24">
+    <div class="flex items-center gap-12">
+      <button class="btn btn-secondary btn-sm" onclick="qqGoBackToEdit()">← 수정하기</button>
+      <div>
+        <div class="page-title">과제 면접 평가표 — ${escHtml(qq.name)}</div>
+        <div class="page-subtitle">${escHtml(qq.pos)} · 과제 면접</div>
+      </div>
+    </div>
+    <div class="flex gap-8">
+      <button class="btn btn-primary btn-sm" onclick="saveQQResult()">💾 결과 저장</button>
+      <button class="btn btn-secondary btn-sm" onclick="printQQResult()">🖨️ PDF 출력</button>
+      <button class="btn btn-secondary btn-sm" onclick="qq=null;renderQQ()">새 면접 시작</button>
+    </div>
+  </div>
+  ${isFail ? `<div class="qq-fail-banner mb-16">⛔ 불합격 확정 — Red Flag 발생 (${escHtml(qq.failQ || '')}${qq.failType ? ' · ' + escHtml(qq.failType) : ''})</div>` : ''}
+  <div class="card mb-16" style="border-left:4px solid ${isFail ? '#cc3333' : '#2a9a50'}">
+    <div class="ci-result-verdict ${vClass}">${isFail ? '🚨' : '✅'} ${verdict}</div>
+    <div style="text-align:center;font-size:13px;color:#888">결정 규칙: Red Flag 1개 발생 시 즉시 불합격 (Zero Tolerance)</div>
+  </div>
+  <div class="grid-2 gap-16 mb-16">
+    <div class="card">
+      <div class="section-title mb-12">🚨 Red Flag 상세</div>
+      ${redHtml}
+    </div>
+    <div class="card">
+      <div class="section-title mb-12">🏅 Gold Flag 목록</div>
+      ${goldHtml}
+    </div>
+  </div>
+  <div class="card mb-16">
+    <div class="section-title mb-12">3대 검증 축 요약</div>
+    ${axisRows}
+  </div>
+  <div class="card mb-16">
+    <div class="section-title mb-12">질문별 평가 상세</div>
+    ${qSummary}
+  </div>
+  <div class="card">
+    <div class="section-title mb-12">종합 의견</div>
+    <textarea id="qq-opinion" class="form-control" rows="10" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(qq.opinion || '')}</textarea>
+    <div class="text-sm text-gray" style="margin-top:6px">※ "💾 결과 저장" 시 함께 저장됩니다.</div>
+  </div>`;
+    }
+
+    function saveQQResult() {
+      if (!qq || !qq.done) return;
+      const isFail = qq.failed;
+      const verdict = isFail ? '불합격 (Drop)' : '합격';
+      const now = new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      const opinion = document.getElementById('qq-opinion')?.value.trim() || '';
+      qq.opinion = opinion;
+
+      const record = {
+        phase: 5,
+        decisionRule: 'ANY_RED_FLAG_FAIL',
+        savedAt: now,
+        name: qq.name,
+        pos: qq.pos,
+        verdict,
+        isFail,
+        failQ: qq.failQ,
+        failType: qq.failType,
+        questions: qq.questions.map(q => ({ id: q.id, label: q.label, axis: q.axis, group: q.group, question: q.question, criteria: q.criteria })),
+        results: qq.results,
+        opinion,
+      };
+
+      let saved = [];
+      try { saved = JSON.parse(localStorage.getItem('wm_qq_results') || '[]'); } catch (e) { saved = []; }
+      saved.unshift(record);
+      localStorage.setItem('wm_qq_results', JSON.stringify(saved));
+      addAuditLog('우성 관리자', '과제 면접 결과 저장', `${qq.name} (${qq.pos}) → ${verdict}`);
+      showToast('과제 면접 결과가 저장되었습니다. "과제 면접 결과" 메뉴에서 확인하세요.', 'success');
+    }
+
+    function printQQResult() {
+      if (!qq || !qq.done) return;
+      const isFail = qq.failed;
+      const verdict = isFail ? '🚨 불합격 (Drop)' : '✅ 합격';
+      const now = new Date().toLocaleString('ko-KR');
+      const opinion = document.getElementById('qq-opinion')?.value.trim() || qq.opinion || '';
+
+      const qRows = qq.questions.map(q => {
+        const r = qq.results[q.id] || {};
+        const skip = r.status === 'skip';
+        const j = r.judgment || '미평가';
+        const jTx = skip ? '⏭ 미진행' : j === 'gold' ? '🏅 Gold' : j === 'ok' ? '✅ 양호' : j === 'red' ? '🚨 Red' : '미평가';
+        return `<tr>
+      <td style="padding:6px 10px;border:1px solid #ddd;font-weight:700">${q.id}</td>
+      <td style="padding:6px 10px;border:1px solid #ddd">${escHtml(q.label)}</td>
+      <td style="padding:6px 10px;border:1px solid #ddd">${jTx}${r.redFlagType ? ' (' + escHtml(r.redFlagType) + ')' : ''}</td>
+      <td style="padding:6px 10px;border:1px solid #ddd;font-size:12px;color:#555">${escHtml(r.memo || '')}</td>
+    </tr>`;
+      }).join('');
+
+      const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+  <title>과제 면접 평가표 — ${qq.name}</title>
+  <style>
+    body { font-family: -apple-system, 'Malgun Gothic', sans-serif; font-size: 13px; color: #333; padding: 32px; max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .meta { color: #666; font-size: 13px; margin-bottom: 24px; }
+    .verdict { font-size: 28px; font-weight: 700; padding: 16px 24px; border-radius: 8px; margin-bottom: 24px; text-align: center; background: ${isFail ? '#fff0f0' : '#f0fff4'}; color: ${isFail ? '#cc3333' : '#2a9a50'}; border: 2px solid ${isFail ? '#f0c0c0' : '#b0e8c0'}; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    th { background: #333; color: #fff; padding: 8px 10px; text-align: left; font-size: 12px; }
+    h2 { font-size: 15px; font-weight: 700; margin: 24px 0 8px; border-bottom: 2px solid #333; padding-bottom: 6px; }
+    @media print { body { padding: 16px; } }
+  </style></head><body>
+  <h1>과제(미니 퀘스트) 면접 평가표</h1>
+  <div class="meta">지원자: <strong>${qq.name}</strong> &nbsp;|&nbsp; 포지션: <strong>${qq.pos}</strong> &nbsp;|&nbsp; 평가일: ${now}</div>
+  <div class="verdict">${verdict}${isFail ? ` · ${qq.failQ} (${qq.failType || '미지정'})` : ''}</div>
+  <h2>질문별 평가 상세</h2>
+  <table><thead><tr><th style="width:50px">Q</th><th>항목</th><th style="width:140px">판정</th><th>메모</th></tr></thead><tbody>${qRows}</tbody></table>
+  ${opinion ? `<h2>종합 의견</h2><div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;font-size:13px;line-height:1.8;white-space:pre-wrap">${opinion.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}
+  <div style="text-align:center;color:#aaa;font-size:11px;margin-top:32px;border-top:1px solid #eee;padding-top:12px">채용매칭 시스템 · 과제 면접 평가 · ${now}</div>
+  <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`;
+
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+    }
+
+    // ── 과제 면접 결과 목록/상세 ──
+    let currentQQResultIdx = -1;
+
+    function loadQQResults() {
+      try { return JSON.parse(localStorage.getItem('wm_qq_results') || '[]'); } catch (e) { return []; }
+    }
+
+    function renderQQResults() {
+      const all = loadQQResults();
+      const filter = document.getElementById('qqr-filter-verdict')?.value || '';
+      const rows = filter ? all.filter(r => r.verdict.includes(filter)) : all;
+
+      const total = all.length;
+      const passed = all.filter(r => !r.isFail).length;
+      const failed = all.filter(r => r.isFail).length;
+      const passRate = total ? Math.round((passed / total) * 100) : 0;
+      const statsEl = document.getElementById('qqr-stats');
+      if (statsEl) {
+        statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-label">전체 평가</div><div class="stat-value">${total}</div><div class="stat-change text-gray">저장된 과제 면접 결과</div></div>
+      <div class="stat-card"><div class="stat-label">합격</div><div class="stat-value text-green">${passed}</div><div class="stat-change text-gray">Red Flag 없음</div></div>
+      <div class="stat-card"><div class="stat-label">불합격</div><div class="stat-value text-red">${failed}</div><div class="stat-change text-gray">Red Flag 발생</div></div>
+      <div class="stat-card"><div class="stat-label">합격률</div><div class="stat-value">${passRate}<span style="font-size:16px;color:#888">%</span></div><div class="stat-change text-gray">${total}건 기준</div></div>
+    `;
+      }
+
+      const tbody = document.getElementById('qqr-tbody');
+      if (!tbody) return;
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">${filter ? '해당 조건의 결과가 없습니다' : '저장된 과제 면접 결과가 없습니다'}</div></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows.map(r => {
+        const realIdx = all.indexOf(r);
+        const isFail = r.isFail;
+        const badgeCls = isFail ? 'badge-red' : 'badge-green';
+        const verdictTx = isFail ? '🚨 불합격' : '✅ 합격';
+        return `<tr>
+      <td><strong>${escHtml(r.name)}</strong></td>
+      <td>${escHtml(r.pos)}</td>
+      <td><span class="badge ${badgeCls}">${verdictTx}</span></td>
+      <td>${isFail ? `<span class="badge badge-red">${escHtml(r.failQ || '')} · ${escHtml(r.failType || '미지정')}</span>` : '<span class="text-gray text-sm">없음</span>'}</td>
+      <td class="text-gray text-sm">${r.savedAt || '—'}</td>
+      <td class="flex gap-8">
+        <button class="btn btn-secondary btn-sm" onclick="openQQResultDetail(${realIdx})">상세 보기</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteQQResultAt(${realIdx})">삭제</button>
+      </td>
+    </tr>`;
+      }).join('');
+    }
+
+    function clearAllQQResults() {
+      const all = loadQQResults();
+      if (!all.length) { showToast('삭제할 결과가 없습니다.', 'info'); return; }
+      showConfirm('전체 삭제', `저장된 과제 면접 결과 ${all.length}건을 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`, () => {
+        localStorage.removeItem('wm_qq_results');
+        showToast('전체 과제 면접 결과가 삭제되었습니다.', 'success');
+        renderQQResults();
+      });
+    }
+
+    function deleteQQResultAt(idx) {
+      const all = loadQQResults();
+      const r = all[idx];
+      if (!r) return;
+      showConfirm('과제 면접 결과 삭제', `"${r.name}" (${r.pos}) 과제 면접 결과를 삭제하시겠습니까?`, () => {
+        all.splice(idx, 1);
+        localStorage.setItem('wm_qq_results', JSON.stringify(all));
+        showToast('과제 면접 결과가 삭제되었습니다.', 'success');
+        renderQQResults();
+      });
+    }
+
+    function openQQResultDetail(idx) {
+      const all = loadQQResults();
+      const r = all[idx];
+      if (!r) return;
+      currentQQResultIdx = idx;
+
+      document.getElementById('qqrd-title').textContent = `과제 면접 결과 — ${r.name}`;
+      document.getElementById('qqrd-subtitle').textContent = `${r.pos} · ${r.savedAt}`;
+
+      const isFail = r.isFail;
+      const vClass = isFail ? 'ci-result-fail' : 'ci-result-pass';
+      const verdict = isFail ? '🚨 불합격 (Drop)' : '✅ 합격';
+      const questions = r.questions || [];
+      const results = r.results || {};
+
+      const qSummary = questions.length
+        ? questions.map(q => {
+          const res = results[q.id] || {};
+          const skip = res.status === 'skip';
+          const j = res.judgment || '';
+          return `<div class="card mb-8" style="padding:0;overflow:hidden">
+          <div style="background:#f8f8f8;padding:10px 16px;border-bottom:1px solid #eee">
+            <div class="flex items-center gap-8 mb-8">
+              <span class="badge badge-gray" style="font-size:11px">${q.id}</span>
+              <span class="font-bold" style="font-size:13px">${escHtml(q.label)}</span>
+              <span class="badge badge-gray" style="font-size:11px">${escHtml(q.axis)}</span>
+              ${skip ? '<span class="badge badge-gray" style="font-size:11px">미진행</span>' : `
+              <button class="ci-btn-gold${j === 'gold' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="qqrdSetJudgment(${idx},'${q.id}','gold')">🏅 Gold</button>
+              <button class="ci-btn-g${j === 'ok' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="qqrdSetJudgment(${idx},'${q.id}','ok')">✅ 양호</button>
+              <button class="ci-btn-r${j === 'red' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="qqrdSetJudgment(${idx},'${q.id}','red')">🚨 Red</button>`}
+            </div>
+            ${!skip && j === 'red' ? `
+            <select class="form-control mb-8" style="margin-bottom:8px" onchange="qqrdSetRedFlagType(${idx},'${q.id}',this.value)">
+              <option value="">-- Red Flag 유형 선택 --</option>
+              ${RED_FLAG_TYPES.map(t => `<option value="${escHtml(t)}"${res.redFlagType === t ? ' selected' : ''}>${escHtml(t)}</option>`).join('')}
+            </select>` : ''}
+            ${!skip ? `<textarea class="form-control" style="font-size:12px" rows="2" placeholder="메모..." onchange="qqrdSaveMemo(${idx},'${q.id}',this.value)">${escHtml(res.memo || '')}</textarea>` : ''}
+          </div>
+        </div>`;
+        }).join('')
+        : '<p class="text-gray text-sm">저장된 평가 상세가 없습니다.</p>';
+
+      document.getElementById('qqrd-body').innerHTML = `
+    <div class="card mb-16" style="border-left:4px solid ${isFail ? '#cc3333' : '#2a9a50'}">
+      <div class="ci-result-verdict ${vClass}" style="font-size:28px">${verdict}</div>
+      <div style="text-align:center;font-size:13px;color:#888">${isFail ? `Red Flag: ${escHtml(r.failQ || '')} · ${escHtml(r.failType || '미지정')}` : '결정 규칙: Red Flag 1개 발생 시 즉시 불합격'}</div>
+    </div>
+    <div class="section-title mb-12">질문별 평가 상세</div>
+    ${qSummary}
+    <div class="card mt-16" style="margin-top:16px">
+      <div class="flex items-center justify-between mb-12">
+        <div class="section-title">종합 의견</div>
+        <button class="btn btn-primary btn-sm" onclick="saveQQOpinion(${idx})">저장</button>
+      </div>
+      <textarea id="qqrd-opinion" class="form-control" rows="10" placeholder="면접 전반에 대한 종합 의견, 특이사항, 추천/비추천 근거 등을 자유롭게 작성하세요.">${escHtml(r.opinion || '')}</textarea>
+    </div>
+  `;
+      nav('qq-result-detail');
+    }
+
+    function qqrdRecomputeVerdict(r) {
+      const anyRed = Object.entries(r.results || {}).find(([, v]) => v.judgment === 'red');
+      r.isFail = !!anyRed;
+      r.verdict = r.isFail ? '불합격 (Drop)' : '합격';
+      r.failQ = anyRed ? anyRed[0] : null;
+      r.failType = anyRed ? (anyRed[1].redFlagType || '') : null;
+    }
+
+    function qqrdSetJudgment(idx, qId, judgment) {
+      const all = loadQQResults();
+      const r = all[idx];
+      if (!r) return;
+      r.results = r.results || {};
+      r.results[qId] = r.results[qId] || {};
+      r.results[qId].judgment = r.results[qId].judgment === judgment ? '' : judgment;
+      qqrdRecomputeVerdict(r);
+      localStorage.setItem('wm_qq_results', JSON.stringify(all));
+      openQQResultDetail(idx);
+    }
+
+    function qqrdSetRedFlagType(idx, qId, type) {
+      const all = loadQQResults();
+      const r = all[idx];
+      if (!r) return;
+      r.results = r.results || {};
+      r.results[qId] = r.results[qId] || {};
+      r.results[qId].redFlagType = type;
+      qqrdRecomputeVerdict(r);
+      localStorage.setItem('wm_qq_results', JSON.stringify(all));
+    }
+
+    function qqrdSaveMemo(idx, qId, val) {
+      const all = loadQQResults();
+      const r = all[idx];
+      if (!r) return;
+      r.results = r.results || {};
+      r.results[qId] = r.results[qId] || {};
+      r.results[qId].memo = val;
+      localStorage.setItem('wm_qq_results', JSON.stringify(all));
+    }
+
+    function saveQQOpinion(idx) {
+      const all = loadQQResults();
+      if (!all[idx]) return;
+      const opinion = document.getElementById('qqrd-opinion')?.value.trim() || '';
+      all[idx].opinion = opinion;
+      localStorage.setItem('wm_qq_results', JSON.stringify(all));
+      showToast('종합 의견이 저장되었습니다.', 'success');
     }
 
     // ══════════════════════════════════════════════════

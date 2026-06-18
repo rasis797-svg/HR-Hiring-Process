@@ -1022,6 +1022,37 @@
       color: #fff;
     }
 
+    .ci-btn-gold {
+      flex: 1;
+      padding: 11px;
+      background: #fffbea;
+      color: #c98a00;
+      border: 2px solid #c98a00;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .ci-btn-gold:hover,
+    .ci-btn-gold.sel {
+      background: #c98a00;
+      color: #fff;
+    }
+
+    .qq-fail-banner {
+      background: #fff0f0;
+      border: 2px solid #f0c0c0;
+      color: #cc3333;
+      font-weight: 700;
+      font-size: 14px;
+      text-align: center;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
     .ci-skip-toggle {
       display: flex;
       border: 1px solid #d0d0d0;
@@ -1284,6 +1315,14 @@
 
     .ci-tree-dot.red {
       background: #cc3333;
+    }
+
+    .ci-tree-dot.gold {
+      background: #c98a00;
+    }
+
+    .ci-tree-q-head.ci-tree-gold {
+      border-left-color: #c98a00;
     }
 
     .ci-content-panel {
