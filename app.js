@@ -4719,8 +4719,7 @@ ${m.extractedText.substring(0, 3000)}
     // ══════════════════════════════════════════════════
 
     let currentCIResultIdx = -1;
-    let cirdAccordionOpen = new Set(); // 아코디언 펼쳐진 질문 ID 집합
-    let cirdQTextOpen = new Set();     // 메인 질문 텍스트 표시 중인 ID 집합
+    let cirdQMode = {};  // { [qId]: 'none' | 'eval' }
     let assignShowRejected = false;    // 불합격 포함 여부
 
     function loadCIResults() {
@@ -4797,15 +4796,8 @@ ${m.extractedText.substring(0, 3000)}
       }).join('');
     }
 
-    function cirdToggleQText(qId) {
-      if (cirdQTextOpen.has(qId)) cirdQTextOpen.delete(qId);
-      else cirdQTextOpen.add(qId);
-      openCIResultDetail(currentCIResultIdx);
-    }
-
-    function cirdToggleAccordion(qId) {
-      if (cirdAccordionOpen.has(qId)) cirdAccordionOpen.delete(qId);
-      else cirdAccordionOpen.add(qId);
+    function cirdSetQMode(qId, mode) {
+      cirdQMode[qId] = (cirdQMode[qId] === mode) ? 'none' : mode;
       openCIResultDetail(currentCIResultIdx);
     }
 
@@ -4852,13 +4844,9 @@ ${m.extractedText.substring(0, 3000)}
         ? qKeys.map(qId => {
           const res = results[qId];
           const mFlag = res.mainFlag || '';
-          const isOpen = cirdAccordionOpen.has(qId);
-          const chevron = isOpen ? '▼' : '▶';
-          const isQTextOpen = cirdQTextOpen.has(qId);
+          const mode = cirdQMode[qId] || 'none';
+          const isEvalOpen = mode === 'eval';
           const qDef = CORE_QB.find(q => q.id === qId);
-          const qTextHtml = qDef?.main
-            ? `<div style="display:${isQTextOpen ? 'block' : 'none'};margin:8px 0 4px;padding:10px 14px;background:#f0f8ff;border-left:3px solid #4a9edd;border-radius:0 6px 6px 0;font-size:13px;color:#2c5f8a;line-height:1.7;white-space:pre-wrap">${escHtml(qDef.main)}</div>`
-            : '';
           const subItems = Object.entries(res.subs || {}).map(([sid, sv]) => {
             const skip = sv.status === 'skip';
             const sf = sv.flag || '';
@@ -4878,22 +4866,33 @@ ${m.extractedText.substring(0, 3000)}
             : mFlag === 'green'
               ? '<span class="badge badge-green" style="font-size:11px">✅ Green</span>'
               : '<span class="badge badge-gray" style="font-size:11px">미평가</span>';
+          const segBtn = (label, seg) => {
+            const active = mode === seg;
+            return `<button onclick="cirdSetQMode('${qId}','${seg}')" style="padding:3px 12px;font-size:11px;font-weight:${active?'700':'400'};background:${active?'#333':'#fff'};color:${active?'#fff':'#555'};border:none;cursor:pointer">${label}</button>`;
+          };
+          // 브레드크럼: Q1 › 카테고리 › 질문 텍스트
+          const crumbQ = qDef?.main
+            ? `<span style="color:#bbb;margin:0 4px">›</span><span style="font-size:12px;color:#555;line-height:1.6">${escHtml(qDef.main)}</span>`
+            : '';
           return `<div class="card mb-8" style="padding:0;overflow:hidden">
-          <div style="background:#f8f8f8;padding:10px 16px;border-bottom:1px solid #eee">
-            <div class="flex items-center gap-8 mb-4" style="flex-wrap:wrap">
-              <div class="flex items-center gap-8" style="cursor:pointer;flex:1;min-width:0" onclick="cirdToggleAccordion('${qId}')">
-                <span style="font-size:13px;color:#888;width:16px;flex-shrink:0">${chevron}</span>
-                <span class="badge badge-gray" style="font-size:11px">${qId}</span>
-                <span class="font-bold" style="font-size:13px">메인 질문</span>
-                ${mFlagBadge}
+          <div style="background:#f8f8f8;padding:10px 16px;${isEvalOpen ? 'border-bottom:1px solid #eee' : ''}">
+            <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
+              <div style="flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px;line-height:1.7">
+                <span style="font-size:11px;font-weight:700;background:#555;color:#fff;padding:1px 8px;border-radius:4px;flex-shrink:0">${qId}</span>
+                <span style="color:#bbb;margin:0 2px">›</span>
+                <span style="font-size:12px;font-weight:600;color:#444;flex-shrink:0">${escHtml(qDef?.cat || '—')}</span>
+                ${crumbQ}
               </div>
-              <div class="flex gap-6" style="flex-shrink:0">
-                ${qDef?.main ? `<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 10px" onclick="cirdToggleQText('${qId}')">${isQTextOpen ? '질문 숨기기' : '자세히 보기'}</button>` : ''}
-                <span style="font-size:11px;color:#aaa;cursor:pointer" onclick="cirdToggleAccordion('${qId}')">${isOpen ? '평가 숨기기' : '평가 보기'}</span>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-top:2px">
+                ${mFlagBadge}
+                <div style="display:inline-flex;border:1px solid #ddd;border-radius:6px;overflow:hidden">
+                  ${segBtn('닫힘','none')}
+                  <span style="width:1px;background:#ddd;flex-shrink:0"></span>
+                  ${segBtn('평가','eval')}
+                </div>
               </div>
             </div>
-            ${qTextHtml}
-            <div class="cird-q-detail" style="${isOpen ? '' : 'display:none'}">
+            <div class="cird-q-detail" style="${isEvalOpen ? 'margin-top:10px' : 'display:none'}">
               <div class="flex items-center gap-8 mb-8">
                 <button class="ci-btn-g${mFlag === 'green' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="cirdSetFlag(${idx},'${qId}','main','green')">✅ Green</button>
                 <button class="ci-btn-r${mFlag === 'red' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="cirdSetFlag(${idx},'${qId}','main','red')">🚨 Red Flag</button>
@@ -4901,7 +4900,7 @@ ${m.extractedText.substring(0, 3000)}
               <textarea class="form-control" style="font-size:12px;width:100%;box-sizing:border-box" rows="2" placeholder="메모..." onchange="cirdSaveMemo(${idx},'${qId}','main',this.value)">${escHtml(res.mainMemo || '')}</textarea>
             </div>
           </div>
-          <div class="cird-q-subs" style="${isOpen ? '' : 'display:none'}">${subItems}</div>
+          <div class="cird-q-subs" style="${isEvalOpen ? '' : 'display:none'}">${subItems}</div>
         </div>`;
         }).join('')
         : '<p class="text-gray text-sm">저장된 평가 상세가 없습니다.</p>';
@@ -4930,7 +4929,7 @@ ${m.extractedText.substring(0, 3000)}
     <div class="flex items-center justify-between mb-12">
       <div class="section-title">질문별 평가 상세</div>
       <div class="flex gap-8">
-        <button class="btn btn-secondary btn-sm" onclick="cirdExpandAll(${JSON.stringify(qKeys)})">전체 펼치기</button>
+        <button class="btn btn-secondary btn-sm" onclick="cirdExpandAll()">전체 펼치기</button>
         <button class="btn btn-secondary btn-sm" onclick="cirdCollapseAll()">전체 접기</button>
       </div>
     </div>
@@ -4973,13 +4972,15 @@ ${m.extractedText.substring(0, 3000)}
       nav('ci-result-detail');
     }
 
-    function cirdExpandAll(qKeys) {
-      qKeys.forEach(k => cirdAccordionOpen.add(k));
+    function cirdExpandAll() {
+      const r = loadCIResults()[currentCIResultIdx];
+      if (!r) return;
+      Object.keys(r.results || {}).forEach(k => { cirdQMode[k] = 'eval'; });
       openCIResultDetail(currentCIResultIdx);
     }
 
     function cirdCollapseAll() {
-      cirdAccordionOpen.clear();
+      cirdQMode = {};
       openCIResultDetail(currentCIResultIdx);
     }
 
@@ -5079,48 +5080,70 @@ ${m.extractedText.substring(0, 3000)}
         `<tr><td style="padding:6px 10px;border:1px solid #ddd">${rf.id}</td><td style="padding:6px 10px;border:1px solid #ddd">${rf.memo || '—'}</td></tr>`
       ).join('') || '<tr><td colspan="2" style="padding:6px 10px;border:1px solid #ddd;color:#aaa">Red Flag 없음</td></tr>';
 
+      const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
       const results = r.results || {};
-      const qRows = Object.keys(results).map(qId => {
+      const qBlocks = Object.keys(results).map(qId => {
         const res = results[qId];
-        const mFlag = res.mainFlag || '미평가';
-        const fc = mFlag === 'green' ? '#2a9a50' : mFlag === 'red' ? '#cc3333' : '#888';
-        const subRows = Object.entries(res.subs || {}).map(([sid, sv]) => {
-          const sf = sv.status === 'skip' ? '스킵' : sv.flag || '미평가';
-          return `<tr style="font-size:12px">
-        <td style="padding:4px 8px;border:1px solid #eee;color:#666">${sid}</td>
-        <td style="padding:4px 8px;border:1px solid #eee;font-weight:600;color:${sf === 'green' ? '#2a9a50' : sf === 'red' ? '#cc3333' : '#888'}">${sf === 'green' ? '✅ Green' : sf === 'red' ? '🚨 Red' : sf}</td>
-        <td style="padding:4px 8px;border:1px solid #eee;color:#555;font-size:11px">${escHtml(sv.memo || '')}</td>
-        <td style="padding:4px 8px;border:1px solid #eee;color:#aaa;font-size:11px">${escHtml(sv.reason || '')}</td>
-      </tr>`;
+        const qDef = CORE_QB.find(q => q.id === qId);
+        const mFlag = res.mainFlag || '';
+        const mFlagColor = mFlag === 'green' ? '#2a9a50' : mFlag === 'red' ? '#cc3333' : '#888';
+        const mFlagLabel = mFlag === 'green' ? '✅ Green' : mFlag === 'red' ? '🚨 Red Flag' : '미평가';
+
+        const subBlocks = Object.entries(res.subs || {}).map(([sid, sv]) => {
+          const subDef = qDef?.subs?.find(s => s.id === sid);
+          const isSkip = sv.status === 'skip';
+          const sf = isSkip ? '스킵' : sv.flag || '';
+          const sfColor = sf === 'green' ? '#2a9a50' : sf === 'red' ? '#cc3333' : '#888';
+          const sfLabel = sf === 'green' ? '✅ Green' : sf === 'red' ? '🚨 Red' : isSkip ? '⏭ 스킵' : '미평가';
+          return `<div style="margin:8px 0 0 16px;padding:10px 14px;border-left:3px solid #e8e8e8;background:#fafafa;border-radius:0 6px 6px 0;page-break-inside:avoid">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-size:11px;font-weight:700;background:#eee;color:#555;padding:1px 7px;border-radius:3px">${sid}</span>
+              <span style="font-size:12px;font-weight:700;color:${sfColor}">${sfLabel}</span>
+              ${isSkip && sv.reason ? `<span style="font-size:11px;color:#aaa">— ${esc(sv.reason)}</span>` : ''}
+            </div>
+            ${subDef?.q ? `<div style="font-size:12px;color:#444;line-height:1.7;margin-bottom:${sv.memo ? '8px' : '0'};white-space:pre-wrap">${esc(subDef.q)}</div>` : ''}
+            ${sv.memo ? `<div style="font-size:12px;color:#222;line-height:1.7;padding:6px 10px;background:#fff;border:1px solid #e8e8e8;border-radius:4px;white-space:pre-wrap"><strong style="color:#555;font-size:11px">메모 ·</strong> ${esc(sv.memo)}</div>` : ''}
+          </div>`;
         }).join('');
-        return `<tr style="background:#f8f8f8">
-      <td style="padding:8px 10px;border:1px solid #ddd;font-weight:700">${qId}</td>
-      <td style="padding:8px 10px;border:1px solid #ddd;font-weight:700;color:${fc}">${mFlag === 'green' ? '✅ Green' : mFlag === 'red' ? '🚨 Red Flag' : '미평가'}</td>
-      <td style="padding:8px 10px;border:1px solid #ddd;font-size:12px;color:#555" colspan="2">${escHtml((res.mainMemo || '').substring(0, 80))}</td>
-    </tr>${subRows}`;
+
+        return `<div style="margin-bottom:20px;border:1px solid #ddd;border-radius:8px;overflow:hidden;page-break-inside:avoid">
+          <div style="background:#f5f5f5;padding:10px 16px;border-bottom:1px solid #ddd;display:flex;align-items:center;gap:10px">
+            <span style="font-size:11px;font-weight:700;background:#333;color:#fff;padding:2px 8px;border-radius:4px">${qId}</span>
+            <span style="font-size:12px;font-weight:700;color:#333;flex:1">${esc(qDef?.cat || '—')}</span>
+            <span style="font-size:12px;font-weight:700;color:${mFlagColor}">${mFlagLabel}</span>
+          </div>
+          <div style="padding:12px 16px">
+            ${qDef?.main ? `<div style="font-size:13px;color:#2c5f8a;line-height:1.75;padding:10px 14px;background:#f0f8ff;border-left:3px solid #4a9edd;border-radius:0 6px 6px 0;margin-bottom:${(res.mainMemo || subBlocks) ? '10px' : '0'};white-space:pre-wrap">${esc(qDef.main)}</div>` : ''}
+            ${res.mainMemo ? `<div style="font-size:13px;color:#222;line-height:1.75;padding:8px 12px;background:#fff;border:1px solid #e8e8e8;border-radius:6px;white-space:pre-wrap;margin-bottom:${subBlocks ? '4px' : '0'}"><strong style="color:#555;font-size:11px">메인 메모 ·</strong> ${esc(res.mainMemo)}</div>` : ''}
+            ${subBlocks}
+          </div>
+        </div>`;
       }).join('');
 
       const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
   <title>코어 면접 결과 — ${r.name}</title>
   <style>
-    body{font-family:-apple-system,'Malgun Gothic',sans-serif;font-size:13px;color:#333;padding:32px;max-width:900px;margin:0 auto}
-    h1{font-size:20px;font-weight:700;margin-bottom:4px}
-    .meta{color:#666;font-size:13px;margin-bottom:24px}
-    .verdict{font-size:26px;font-weight:700;padding:14px 24px;border-radius:8px;margin-bottom:24px;text-align:center;background:${isFail ? '#fff0f0' : '#f0fff4'};color:${isFail ? '#cc3333' : '#2a9a50'};border:2px solid ${isFail ? '#f0c0c0' : '#b0e8c0'}}
-    table{width:100%;border-collapse:collapse;margin-bottom:24px}
-    th{background:#333;color:#fff;padding:8px 10px;text-align:left;font-size:12px}
-    h2{font-size:15px;font-weight:700;margin:24px 0 8px;border-bottom:2px solid #333;padding-bottom:6px}
-    @media print{body{padding:12px}}
+    *{box-sizing:border-box}
+    body{font-family:-apple-system,'Malgun Gothic',sans-serif;font-size:13px;color:#333;padding:28px;max-width:860px;margin:0 auto}
+    h1{font-size:20px;font-weight:700;margin:0 0 4px}
+    .meta{color:#666;font-size:12px;margin-bottom:20px}
+    .verdict{font-size:24px;font-weight:700;padding:14px 24px;border-radius:8px;margin-bottom:20px;text-align:center;background:${isFail?'#fff0f0':'#f0fff4'};color:${isFail?'#cc3333':'#2a9a50'};border:2px solid ${isFail?'#f0c0c0':'#b0e8c0'}}
+    table{width:100%;border-collapse:collapse;margin-bottom:20px}
+    th{background:#333;color:#fff;padding:7px 10px;text-align:left;font-size:12px}
+    td{padding:6px 10px;border:1px solid #ddd;font-size:12px}
+    h2{font-size:14px;font-weight:700;margin:20px 0 10px;border-bottom:2px solid #333;padding-bottom:5px}
+    @media print{body{padding:10px}h2{page-break-after:avoid}}
   </style></head><body>
   <h1>WOS 코어 면접 평가 리포트</h1>
   <div class="meta">지원자: <strong>${r.name}</strong> &nbsp;|&nbsp; 포지션: <strong>${r.pos}</strong> &nbsp;|&nbsp; 트랙: ${r.track === 'leader' ? '리더급' : '팀원급'} &nbsp;|&nbsp; 평가일: ${r.savedAt}</div>
   <div class="verdict">${verdict} &nbsp;·&nbsp; Red Flag ${r.redFlagCount}개</div>
   <h2>🚨 Red Flag 목록</h2>
-  <table><thead><tr><th>항목</th><th>메모</th></tr></thead><tbody>${rfRows}</tbody></table>
+  <table><thead><tr><th style="width:80px">항목</th><th>메모</th></tr></thead><tbody>${rfRows}</tbody></table>
   <h2>질문별 평가 상세</h2>
-  <table><thead><tr><th style="width:50px">Q</th><th style="width:100px">판정</th><th>메모</th><th>비고</th></tr></thead><tbody>${qRows}</tbody></table>
-  ${r.opinion ? `<h2>종합 의견</h2><div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;font-size:13px;line-height:1.8;white-space:pre-wrap">${r.opinion.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}
-  ${(() => { const lv = STAR_LEVELS.find(l => l.id === r.starLevel); return lv ? `<h2>최종 등급 평가</h2><div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;font-size:13px;line-height:1.8"><strong>(${lv.id}) ${lv.label}</strong>${r.starMemo ? `<div style="white-space:pre-wrap;margin-top:8px;color:#555">${r.starMemo.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}</div>` : ''; })()}
+  ${qBlocks || '<p style="color:#aaa;font-size:12px">저장된 평가 내용이 없습니다.</p>'}
+  ${r.opinion ? `<h2>종합 의견</h2><div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;font-size:13px;line-height:1.8;white-space:pre-wrap">${esc(r.opinion)}</div>` : ''}
+  ${(() => { const lv = STAR_LEVELS.find(l => l.id === r.starLevel); return lv ? `<h2>최종 등급 평가</h2><div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;font-size:13px;line-height:1.8"><strong>(${lv.id}) ${lv.label}</strong>${r.starMemo ? `<div style="white-space:pre-wrap;margin-top:8px;color:#555">${esc(r.starMemo)}</div>` : ''}</div>` : ''; })()}
   <div style="text-align:center;color:#aaa;font-size:11px;margin-top:32px;border-top:1px solid #eee;padding-top:12px">채용매칭 시스템 · WOS 코어 면접 평가 · ${r.savedAt}</div>
   <script>window.onload=function(){window.print();}<\/script>
   </body></html>`;
