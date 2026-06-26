@@ -1036,6 +1036,7 @@
       const today = new Date().toLocaleDateString('ko-KR',
         { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace('.', '');
       const entry = {
+        id: generateId(),
         applicant, position, date: today, source: sourceLabel, channel,
         extractedText: resumeExtractedText || '',
         score: '—', sub1: '—', sub2: '—', sub3: '—',
@@ -1099,7 +1100,12 @@
         else statusBadge = `<span class="badge badge-gray" style="font-size:11px">검토중</span>`;
         const rowStyle = isRejected ? ' style="opacity:0.6;background:#fff8f8"' : (ps === '최종합격' ? ' style="background:#f5fff8"' : '');
         return `<tr${rowStyle}>
-      <td><strong>${escHtml(m.applicant)}</strong></td>
+      <td id="mname-${realIdx}">
+        <div style="display:flex;align-items:center;gap:5px">
+          <strong>${escHtml(m.applicant)}</strong>
+          <button class="btn btn-secondary btn-sm" style="padding:1px 6px;font-size:11px;flex-shrink:0" onclick="editApplicantName(${realIdx})" title="이름 수정">✏️</button>
+        </div>
+      </td>
       <td>${escHtml(m.position)}</td>
       <td>
         <div style="display:flex;flex-direction:column;gap:4px">
@@ -1114,6 +1120,15 @@
       </td>
       <td><span class="font-bold ${cls}">${m.score}</span>/5</td>
       <td>${sub1}</td><td>${sub2}</td><td>${sub3}</td>
+      <td>
+        <select class="form-control" style="font-size:11px;padding:2px 6px;height:auto;min-width:90px" onchange="changeChannel(${realIdx},this.value)">
+          <option value="" ${!m.channel ? 'selected' : ''}>미지정</option>
+          <option value="온라인" ${m.channel === '온라인' ? 'selected' : ''}>온라인</option>
+          <option value="헤드헌터" ${m.channel === '헤드헌터' ? 'selected' : ''}>헤드헌터</option>
+          <option value="추천채용" ${m.channel === '추천채용' ? 'selected' : ''}>추천채용</option>
+          ${m.channel && !['온라인','헤드헌터','추천채용'].includes(m.channel) ? `<option value="${escHtml(m.channel)}" selected>${escHtml(m.channel)}</option>` : ''}
+        </select>
+      </td>
       <td class="text-gray text-sm">${m.date}</td>
       <td>
         <div style="display:flex;flex-direction:row;gap:6px;align-items:center;white-space:nowrap">
@@ -1124,6 +1139,44 @@
       </td>
     </tr>`;
       }).join('');
+    }
+
+    function editApplicantName(idx) {
+      const cell = document.getElementById(`mname-${idx}`);
+      if (!cell) return;
+      const m = matchingData[idx];
+      if (!m) return;
+      cell.innerHTML = `
+        <div style="display:flex;align-items:center;gap:4px">
+          <input id="mname-input-${idx}" class="form-control" style="width:110px;padding:2px 6px;font-size:13px;height:auto" value="${escHtml(m.applicant)}" onkeydown="if(event.key==='Enter')saveApplicantName(${idx});if(event.key==='Escape')filterMatching()" />
+          <button class="btn btn-primary btn-sm" style="padding:2px 8px;font-size:11px" onclick="saveApplicantName(${idx})">저장</button>
+          <button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px" onclick="filterMatching()">취소</button>
+        </div>`;
+      document.getElementById(`mname-input-${idx}`)?.focus();
+    }
+
+    function saveApplicantName(idx) {
+      const m = matchingData[idx];
+      if (!m) return;
+      const input = document.getElementById(`mname-input-${idx}`);
+      const val = input?.value.trim();
+      if (!val) { showToast('이름을 입력하세요.', 'error'); return; }
+      const old = m.applicant;
+      if (old === val) { filterMatching(); return; }
+      m.applicant = val;
+      saveData();
+      addAuditLog('우성 관리자', '지원자 이름 수정', `${old} → ${val}`);
+      showToast(`이름이 "${val}"(으)로 수정되었습니다.`, 'success');
+      filterMatching();
+    }
+
+    function changeChannel(idx, value) {
+      const m = matchingData[idx];
+      if (!m) return;
+      const old = m.channel || '미지정';
+      m.channel = value;
+      saveData();
+      addAuditLog('우성 관리자', '유입채널 수정', `${m.applicant} · ${old} → ${value || '미지정'}`);
     }
 
     function deleteApplicant(idx) {
@@ -2483,6 +2536,7 @@ ${m.extractedText.substring(0, 3000)}
           await sbSave('wm_interviewers', interviewersPool);
           await sbSave('wm_iv_appts', interviewAppointments);
           await sbSave('wm_iv_settings', interviewSettings);
+          await sbSave('wm_ci_results', loadCIResults());
           showToast('클라우드 초기 업로드 완료', 'success');
           cloudSyncDone = true;
           return;
@@ -2494,13 +2548,21 @@ ${m.extractedText.substring(0, 3000)}
         takeLocalBackup('클라우드 동기화 전 자동 백업');
 
         if (map['wm_sheets'])       { sheetsData = map['wm_sheets'];             localStorage.setItem('wm_sheets', JSON.stringify(sheetsData)); }
-        if (map['wm_matching'])     { matchingData = map['wm_matching'];          localStorage.setItem('wm_matching', JSON.stringify(matchingData)); }
+        if (map['wm_matching'])     {
+          matchingData = map['wm_matching'];
+          // 클라우드에서 내려온 데이터도 id 마이그레이션
+          let migrated = false;
+          matchingData = matchingData.map(m => { if (!m.id) { migrated = true; return { ...m, id: generateId() }; } return m; });
+          localStorage.setItem('wm_matching', JSON.stringify(matchingData));
+          if (migrated) sbSave('wm_matching', matchingData);
+        }
         if (map['wm_audit'])        { auditData = map['wm_audit'];                localStorage.setItem('wm_audit', JSON.stringify(auditData)); }
         if (map['wm_users'])        { usersData = map['wm_users'];                localStorage.setItem('wm_users', JSON.stringify(usersData)); }
         if (map['wm_schedule'])     { scheduleData = map['wm_schedule'];          localStorage.setItem('wm_schedule', JSON.stringify(scheduleData)); }
         if (map['wm_interviewers']) { interviewersPool = map['wm_interviewers'];  localStorage.setItem('wm_interviewers', JSON.stringify(interviewersPool)); }
         if (map['wm_iv_appts'])     { interviewAppointments = map['wm_iv_appts']; localStorage.setItem('wm_iv_appts', JSON.stringify(interviewAppointments)); }
         if (map['wm_iv_settings'])  { interviewSettings = map['wm_iv_settings'];  localStorage.setItem('wm_iv_settings', JSON.stringify(interviewSettings)); }
+        if (map['wm_ci_results'])   { localStorage.setItem('wm_ci_results', JSON.stringify(map['wm_ci_results'])); }
 
         renderDashboard(); renderSheets(); renderMatching(); renderPositions();
         renderReports(); renderAuditLog(); renderUsers(); syncPositionDropdowns();
@@ -2525,9 +2587,22 @@ ${m.extractedText.substring(0, 3000)}
       sbSave('wm_users', usersData);
     }
 
+    function generateId() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+
     function loadData() {
       try { sheetsData = JSON.parse(localStorage.getItem('wm_sheets')) || []; } catch (e) { sheetsData = []; }
-      try { matchingData = JSON.parse(localStorage.getItem('wm_matching')) || []; } catch (e) { matchingData = []; }
+      try {
+        matchingData = JSON.parse(localStorage.getItem('wm_matching')) || [];
+        // 기존 데이터에 id 없으면 마이그레이션
+        let migrated = false;
+        matchingData = matchingData.map(m => {
+          if (!m.id) { migrated = true; return { ...m, id: generateId() }; }
+          return m;
+        });
+        if (migrated) localStorage.setItem('wm_matching', JSON.stringify(matchingData));
+      } catch (e) { matchingData = []; }
       try { auditData = JSON.parse(localStorage.getItem('wm_audit')) || []; } catch (e) { auditData = []; }
       try { usersData = JSON.parse(localStorage.getItem('wm_users')) || []; } catch (e) { usersData = []; }
     }
@@ -4097,6 +4172,7 @@ ${m.extractedText.substring(0, 3000)}
       </div>
     </div>
     <div class="flex gap-8">
+      <button class="btn btn-secondary btn-sm" onclick="saveCIDraft()">📝 임시저장</button>
       <button class="btn btn-primary btn-sm" onclick="saveCIResult()">💾 결과 저장</button>
       <button class="btn btn-secondary btn-sm" onclick="printCIResult()">🖨️ PDF 출력</button>
       <button class="btn btn-secondary btn-sm" onclick="ci=null;renderCI()">새 면접 시작</button>
@@ -4456,6 +4532,7 @@ ${m.extractedText.substring(0, 3000)}
       ci.starMemo = starMemo;
 
       const record = {
+        status: 'done',
         savedAt: now,
         name: ci.name,
         pos: ci.pos,
@@ -4472,10 +4549,104 @@ ${m.extractedText.substring(0, 3000)}
 
       let saved = [];
       try { saved = JSON.parse(localStorage.getItem('wm_ci_results') || '[]'); } catch (e) { saved = []; }
-      saved.unshift(record);
-      localStorage.setItem('wm_ci_results', JSON.stringify(saved));
+      // 기존 임시저장 draft가 있으면 교체, 없으면 앞에 추가
+      if (ci.draftIdx !== undefined && ci.draftIdx >= 0 && saved[ci.draftIdx]?.status === 'draft') {
+        saved[ci.draftIdx] = record;
+        ci.draftIdx = undefined;
+      } else {
+        saved.unshift(record);
+      }
+      saveCIResultsToStorage(saved);
       addAuditLog('우성 관리자', '면접 결과 저장', `${ci.name} (${ci.pos}) → ${verdict}`);
       showToast('면접 결과가 저장되었습니다. "코어 면접 결과" 메뉴에서 확인하세요.', 'success');
+    }
+
+    function saveCIDraft() {
+      if (!ci) return;
+      const opinion = document.getElementById('ci-opinion')?.value.trim() || ci.opinion || '';
+      ci.opinion = opinion;
+      const starMemo = document.getElementById('ci-star-memo')?.value.trim() || ci.starMemo || '';
+      ci.starMemo = starMemo;
+      const now = new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      const isFail = ci.redFlags.length > 0;
+
+      const record = {
+        status: 'draft',
+        savedAt: now,
+        name: ci.name,
+        pos: ci.pos,
+        track: ci.track,
+        verdict: isFail ? '불합격 (Drop)' : '합격',
+        isFail,
+        redFlagCount: ci.redFlags.length,
+        redFlags: ci.redFlags,
+        results: ci.results,
+        opinion,
+        starLevel: ci.starLevel || null,
+        starMemo,
+        ciState: {
+          qIdx: ci.qIdx,
+          subIdx: ci.subIdx,
+          done: ci.done,
+          preAnswered: ci.preAnswered || {},
+          branchSel: ci.branchSel || {},
+          counterPunch: ci.counterPunch || false,
+        },
+      };
+
+      let saved = [];
+      try { saved = JSON.parse(localStorage.getItem('wm_ci_results') || '[]'); } catch (e) { saved = []; }
+      if (ci.draftIdx !== undefined && ci.draftIdx >= 0 && saved[ci.draftIdx]?.status === 'draft') {
+        saved[ci.draftIdx] = record;
+      } else {
+        saved.unshift(record);
+        ci.draftIdx = 0;
+      }
+      saveCIResultsToStorage(saved);
+      showToast('임시저장되었습니다. "코어 면접 결과" 메뉴에서 이어서 작성할 수 있습니다.', 'success');
+    }
+
+    function openCIDraftForEdit(idx) {
+      const all = loadCIResults();
+      const r = all[idx];
+      if (!r || r.status !== 'draft') return;
+      const questions = CORE_QB.filter(q => !q.leaderOnly || r.track === 'leader');
+      ci = {
+        name: r.name,
+        pos: r.pos,
+        track: r.track,
+        questions,
+        qIdx: r.ciState?.qIdx ?? 0,
+        subIdx: r.ciState?.subIdx ?? -1,
+        preAnswered: r.ciState?.preAnswered || {},
+        results: r.results || {},
+        redFlags: r.redFlags || [],
+        branchSel: r.ciState?.branchSel || {},
+        counterPunch: r.ciState?.counterPunch || false,
+        detailOpen: new Set(),
+        done: r.ciState?.done || false,
+        opinion: r.opinion || '',
+        starLevel: r.starLevel || null,
+        starMemo: r.starMemo || '',
+        draftIdx: idx,
+      };
+      nav('core-interview');
+      renderCI();
+    }
+
+    function completeCIDraftResult(idx) {
+      const all = loadCIResults();
+      if (!all[idx] || all[idx].status !== 'draft') return;
+      const now = new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      const opinion = document.getElementById('cird-opinion')?.value.trim() || all[idx].opinion || '';
+      all[idx].status = 'done';
+      all[idx].savedAt = now;
+      all[idx].opinion = opinion;
+      delete all[idx].ciState;
+      saveCIResultsToStorage(all);
+      addAuditLog('우성 관리자', '면접 결과 최종 완료', `${all[idx].name} (${all[idx].pos})`);
+      showToast('면접 평가가 최종 완료되었습니다.', 'success');
+      openCIResultDetail(idx);
     }
 
     function printCIResult() {
@@ -4548,48 +4719,70 @@ ${m.extractedText.substring(0, 3000)}
     // ══════════════════════════════════════════════════
 
     let currentCIResultIdx = -1;
+    let cirdAccordionOpen = new Set(); // 아코디언 펼쳐진 질문 ID 집합
+    let cirdQTextOpen = new Set();     // 메인 질문 텍스트 표시 중인 ID 집합
+    let assignShowRejected = false;    // 불합격 포함 여부
 
     function loadCIResults() {
       try { return JSON.parse(localStorage.getItem('wm_ci_results') || '[]'); } catch (e) { return []; }
     }
 
+    function saveCIResultsToStorage(arr) {
+      localStorage.setItem('wm_ci_results', JSON.stringify(arr));
+      if (cloudSyncDone) sbSave('wm_ci_results', arr);
+    }
+
     function renderCIResults() {
       const all = loadCIResults();
-      const filter = document.getElementById('cir-filter-verdict')?.value || '';
-      const rows = filter ? all.filter(r => r.verdict.includes(filter)) : all;
+      const statusFilter = document.getElementById('cir-filter-status')?.value || '';
+      const verdictFilter = document.getElementById('cir-filter-verdict')?.value || '';
+      let rows = all;
+      if (statusFilter === 'draft') rows = rows.filter(r => r.status === 'draft');
+      else if (statusFilter === 'done') rows = rows.filter(r => !r.status || r.status === 'done');
+      if (verdictFilter) rows = rows.filter(r => r.verdict && r.verdict.includes(verdictFilter));
 
-      // 통계 카드
-      const total = all.length;
-      const passed = all.filter(r => !r.isFail).length;
-      const failed = all.filter(r => r.isFail).length;
+      // 통계 카드 (완료 기준)
+      const doneAll = all.filter(r => !r.status || r.status === 'done');
+      const total = doneAll.length;
+      const passed = doneAll.filter(r => !r.isFail).length;
+      const failed = doneAll.filter(r => r.isFail).length;
       const passRate = total ? Math.round((passed / total) * 100) : 0;
+      const drafts = all.filter(r => r.status === 'draft').length;
       const statsEl = document.getElementById('cir-stats');
       if (statsEl) {
         statsEl.innerHTML = `
-      <div class="stat-card"><div class="stat-label">전체 평가</div><div class="stat-value">${total}</div><div class="stat-change text-gray">저장된 면접 결과</div></div>
+      <div class="stat-card"><div class="stat-label">전체 완료</div><div class="stat-value">${total}</div><div class="stat-change text-gray">저장된 면접 결과</div></div>
       <div class="stat-card"><div class="stat-label">합격</div><div class="stat-value text-green">${passed}</div><div class="stat-change text-gray">Green 판정</div></div>
       <div class="stat-card"><div class="stat-label">불합격</div><div class="stat-value text-red">${failed}</div><div class="stat-change text-gray">Red Flag 판정</div></div>
-      <div class="stat-card"><div class="stat-label">합격률</div><div class="stat-value">${passRate}<span style="font-size:16px;color:#888">%</span></div><div class="stat-change text-gray">${total}건 기준</div></div>
+      <div class="stat-card"><div class="stat-label">작성중</div><div class="stat-value" style="color:#e07000">${drafts}</div><div class="stat-change text-gray">임시저장 건수</div></div>
     `;
       }
 
       const tbody = document.getElementById('cir-tbody');
       if (!tbody) return;
       if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">${filter ? '해당 조건의 결과가 없습니다' : '저장된 면접 결과가 없습니다'}</div></div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">${(statusFilter || verdictFilter) ? '해당 조건의 결과가 없습니다' : '저장된 면접 결과가 없습니다'}</div></div></td></tr>`;
         return;
       }
-      tbody.innerHTML = rows.map((r, i) => {
+      tbody.innerHTML = rows.map((r) => {
         const realIdx = all.indexOf(r);
+        const isDraft = r.status === 'draft';
         const isFail = r.isFail;
         const badgeCls = isFail ? 'badge-red' : 'badge-green';
         const verdictTx = isFail ? '🚨 불합격' : '✅ 합격';
         const trackTx = r.track === 'leader' ? '리더급' : '팀원급';
+        const statusBadge = isDraft
+          ? `<span class="badge badge-orange" style="font-size:11px">작성중</span>`
+          : `<span class="badge badge-green" style="font-size:11px">완료</span>`;
+        const detailBtn = isDraft
+          ? `<button class="btn btn-secondary btn-sm" onclick="openCIDraftForEdit(${realIdx})">이어 작성</button>`
+          : `<button class="btn btn-secondary btn-sm" onclick="openCIResultDetail(${realIdx})">상세 보기</button>`;
         return `<tr>
       <td><strong>${escHtml(r.name)}</strong></td>
       <td>${escHtml(r.pos)}</td>
       <td><span class="badge badge-gray">${trackTx}</span></td>
-      <td><span class="badge ${badgeCls}">${verdictTx}</span></td>
+      <td>${statusBadge}</td>
+      <td>${isDraft ? '<span class="text-gray text-sm">—</span>' : `<span class="badge ${badgeCls}">${verdictTx}</span>`}</td>
       <td>
         ${r.redFlagCount > 0
             ? `<span class="badge badge-red">${r.redFlagCount}개</span>`
@@ -4597,11 +4790,23 @@ ${m.extractedText.substring(0, 3000)}
       </td>
       <td class="text-gray text-sm">${r.savedAt || '—'}</td>
       <td class="flex gap-8">
-        <button class="btn btn-secondary btn-sm" onclick="openCIResultDetail(${realIdx})">상세 보기</button>
+        ${detailBtn}
         <button class="btn btn-danger btn-sm" onclick="deleteCIResultAt(${realIdx})">삭제</button>
       </td>
     </tr>`;
       }).join('');
+    }
+
+    function cirdToggleQText(qId) {
+      if (cirdQTextOpen.has(qId)) cirdQTextOpen.delete(qId);
+      else cirdQTextOpen.add(qId);
+      openCIResultDetail(currentCIResultIdx);
+    }
+
+    function cirdToggleAccordion(qId) {
+      if (cirdAccordionOpen.has(qId)) cirdAccordionOpen.delete(qId);
+      else cirdAccordionOpen.add(qId);
+      openCIResultDetail(currentCIResultIdx);
     }
 
     function openCIResultDetail(idx) {
@@ -4609,13 +4814,28 @@ ${m.extractedText.substring(0, 3000)}
       const r = all[idx];
       if (!r) return;
       currentCIResultIdx = idx;
+      const isDraft = r.status === 'draft';
 
       document.getElementById('cird-title').textContent = `코어 면접 결과 — ${r.name}`;
-      document.getElementById('cird-subtitle').textContent = `${r.pos} · ${r.track === 'leader' ? '리더급' : '팀원급'} · ${r.savedAt}`;
+      document.getElementById('cird-subtitle').textContent =
+        `${r.pos} · ${r.track === 'leader' ? '리더급' : '팀원급'} · ${r.savedAt}${isDraft ? ' ·  임시저장' : ''}`;
+
+      // 상세보기 헤더의 버튼 영역 업데이트
+      const headerBtns = document.querySelector('#page-ci-result-detail .flex.gap-8');
+      if (headerBtns && isDraft) {
+        headerBtns.innerHTML = `
+          <button class="btn btn-primary btn-sm" onclick="completeCIDraftResult(${idx})">✅ 최종 완료</button>
+          <button class="btn btn-secondary" onclick="printSavedCIResult()">🖨️ PDF 출력</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSavedCIResult()">삭제</button>`;
+      } else if (headerBtns) {
+        headerBtns.innerHTML = `
+          <button class="btn btn-secondary" onclick="printSavedCIResult()">🖨️ PDF 출력</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSavedCIResult()">삭제</button>`;
+      }
 
       const isFail = r.isFail;
       const vClass = isFail ? 'ci-result-fail' : 'ci-result-pass';
-      const verdict = isFail ? '🚨 불합격 (Drop)' : '✅ 합격';
+      const verdict = isDraft ? '(임시저장 — 판정 미확정)' : (isFail ? '🚨 불합격 (Drop)' : '✅ 합격');
 
       // Red Flag 목록
       const rfRows = (r.redFlags || []).map(rf => `
@@ -4625,17 +4845,24 @@ ${m.extractedText.substring(0, 3000)}
       ${rf.memo ? `<span class="text-gray text-sm">— ${escHtml(rf.memo)}</span>` : ''}
     </div>`).join('') || '<p class="text-gray text-sm">Red Flag 없음</p>';
 
-      // 질문별 요약 (results 객체 기반)
+      // 질문별 평가 상세 — 아코디언
       const results = r.results || {};
       const qKeys = Object.keys(results);
       const qSummary = qKeys.length
         ? qKeys.map(qId => {
           const res = results[qId];
           const mFlag = res.mainFlag || '';
+          const isOpen = cirdAccordionOpen.has(qId);
+          const chevron = isOpen ? '▼' : '▶';
+          const isQTextOpen = cirdQTextOpen.has(qId);
+          const qDef = CORE_QB.find(q => q.id === qId);
+          const qTextHtml = qDef?.main
+            ? `<div style="display:${isQTextOpen ? 'block' : 'none'};margin:8px 0 4px;padding:10px 14px;background:#f0f8ff;border-left:3px solid #4a9edd;border-radius:0 6px 6px 0;font-size:13px;color:#2c5f8a;line-height:1.7;white-space:pre-wrap">${escHtml(qDef.main)}</div>`
+            : '';
           const subItems = Object.entries(res.subs || {}).map(([sid, sv]) => {
             const skip = sv.status === 'skip';
             const sf = sv.flag || '';
-            return `<div style="padding:8px 0 8px 16px;border-bottom:1px solid #f8f8f8;display:flex;flex-direction:column;gap:6px">
+            return `<div class="cird-q-sub-item" style="padding:8px 0 8px 16px;border-bottom:1px solid #f8f8f8;display:flex;flex-direction:column;gap:6px">
             <div class="flex items-center gap-8">
               <span style="font-size:11px;background:#f0f0f0;color:#555;padding:1px 6px;border-radius:3px;flex-shrink:0">${sid}</span>
               ${skip ? '<span class="badge badge-gray" style="font-size:11px">스킵</span>' : `
@@ -4646,25 +4873,43 @@ ${m.extractedText.substring(0, 3000)}
             ${!skip ? `<textarea class="form-control" style="font-size:12px;width:100%;box-sizing:border-box" rows="2" placeholder="메모..." onchange="cirdSaveMemo(${idx},'${qId}','${sid}',this.value)">${escHtml(sv.memo || '')}</textarea>` : ''}
           </div>`;
           }).join('');
+          const mFlagBadge = mFlag === 'red'
+            ? '<span class="badge badge-red" style="font-size:11px">🚨 Red Flag</span>'
+            : mFlag === 'green'
+              ? '<span class="badge badge-green" style="font-size:11px">✅ Green</span>'
+              : '<span class="badge badge-gray" style="font-size:11px">미평가</span>';
           return `<div class="card mb-8" style="padding:0;overflow:hidden">
           <div style="background:#f8f8f8;padding:10px 16px;border-bottom:1px solid #eee">
-            <div class="flex items-center gap-8 mb-8">
-              <span class="badge badge-gray" style="font-size:11px">${qId}</span>
-              <span class="font-bold" style="font-size:13px">메인 질문</span>
-              <button class="ci-btn-g${mFlag === 'green' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="cirdSetFlag(${idx},'${qId}','main','green')">✅ Green</button>
-              <button class="ci-btn-r${mFlag === 'red' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="cirdSetFlag(${idx},'${qId}','main','red')">🚨 Red Flag</button>
+            <div class="flex items-center gap-8 mb-4" style="flex-wrap:wrap">
+              <div class="flex items-center gap-8" style="cursor:pointer;flex:1;min-width:0" onclick="cirdToggleAccordion('${qId}')">
+                <span style="font-size:13px;color:#888;width:16px;flex-shrink:0">${chevron}</span>
+                <span class="badge badge-gray" style="font-size:11px">${qId}</span>
+                <span class="font-bold" style="font-size:13px">메인 질문</span>
+                ${mFlagBadge}
+              </div>
+              <div class="flex gap-6" style="flex-shrink:0">
+                ${qDef?.main ? `<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 10px" onclick="cirdToggleQText('${qId}')">${isQTextOpen ? '질문 숨기기' : '자세히 보기'}</button>` : ''}
+                <span style="font-size:11px;color:#aaa;cursor:pointer" onclick="cirdToggleAccordion('${qId}')">${isOpen ? '평가 숨기기' : '평가 보기'}</span>
+              </div>
             </div>
-            <textarea class="form-control" style="font-size:12px;width:100%;box-sizing:border-box" rows="2" placeholder="메모..." onchange="cirdSaveMemo(${idx},'${qId}','main',this.value)">${escHtml(res.mainMemo || '')}</textarea>
+            ${qTextHtml}
+            <div class="cird-q-detail" style="${isOpen ? '' : 'display:none'}">
+              <div class="flex items-center gap-8 mb-8">
+                <button class="ci-btn-g${mFlag === 'green' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="cirdSetFlag(${idx},'${qId}','main','green')">✅ Green</button>
+                <button class="ci-btn-r${mFlag === 'red' ? ' sel' : ''}" style="padding:2px 10px;font-size:11px" onclick="cirdSetFlag(${idx},'${qId}','main','red')">🚨 Red Flag</button>
+              </div>
+              <textarea class="form-control" style="font-size:12px;width:100%;box-sizing:border-box" rows="2" placeholder="메모..." onchange="cirdSaveMemo(${idx},'${qId}','main',this.value)">${escHtml(res.mainMemo || '')}</textarea>
+            </div>
           </div>
-          ${subItems}
+          <div class="cird-q-subs" style="${isOpen ? '' : 'display:none'}">${subItems}</div>
         </div>`;
         }).join('')
         : '<p class="text-gray text-sm">저장된 평가 상세가 없습니다.</p>';
 
       document.getElementById('cird-body').innerHTML = `
-    <div class="card mb-16" style="border-left:4px solid ${isFail ? '#cc3333' : '#2a9a50'}">
-      <div class="ci-result-verdict ${vClass}" style="font-size:28px">${verdict}</div>
-      <div style="text-align:center;font-size:13px;color:#888">Red Flag ${r.redFlagCount}개 · Zero Tolerance 정책 적용</div>
+    <div class="card mb-16" style="border-left:4px solid ${isFail ? '#cc3333' : (isDraft ? '#e07000' : '#2a9a50')}">
+      <div class="ci-result-verdict ${isDraft ? '' : vClass}" style="font-size:28px;${isDraft ? 'color:#e07000' : ''}">${verdict}</div>
+      <div style="text-align:center;font-size:13px;color:#888">${isDraft ? '작성중 — 임시저장된 평가입니다' : `Red Flag ${r.redFlagCount}개 · Zero Tolerance 정책 적용`}</div>
     </div>
     <div class="grid-2 gap-16 mb-16">
       <div class="card">
@@ -4677,12 +4922,18 @@ ${m.extractedText.substring(0, 3000)}
           <div class="flex justify-between"><span class="text-gray">지원자</span><strong>${escHtml(r.name)}</strong></div>
           <div class="flex justify-between"><span class="text-gray">포지션</span><span>${escHtml(r.pos)}</span></div>
           <div class="flex justify-between"><span class="text-gray">트랙</span><span>${r.track === 'leader' ? '리더급' : '팀원급'}</span></div>
-          <div class="flex justify-between"><span class="text-gray">판정</span><span class="font-bold ${isFail ? 'text-red' : 'text-green'}">${isFail ? '불합격' : '합격'}</span></div>
+          <div class="flex justify-between"><span class="text-gray">판정</span><span class="font-bold ${isFail ? 'text-red' : 'text-green'}">${isDraft ? '—' : (isFail ? '불합격' : '합격')}</span></div>
           <div class="flex justify-between"><span class="text-gray">평가일시</span><span>${escHtml(r.savedAt || '—')}</span></div>
         </div>
       </div>
     </div>
-    <div class="section-title mb-12">질문별 평가 상세</div>
+    <div class="flex items-center justify-between mb-12">
+      <div class="section-title">질문별 평가 상세</div>
+      <div class="flex gap-8">
+        <button class="btn btn-secondary btn-sm" onclick="cirdExpandAll(${JSON.stringify(qKeys)})">전체 펼치기</button>
+        <button class="btn btn-secondary btn-sm" onclick="cirdCollapseAll()">전체 접기</button>
+      </div>
+    </div>
     ${qSummary}
     <div class="card mt-16" style="margin-top:16px">
       <div class="flex items-center justify-between mb-12">
@@ -4710,8 +4961,26 @@ ${m.extractedText.substring(0, 3000)}
         <textarea id="cird-star-memo" class="form-control" rows="10" style="width:100%;box-sizing:border-box;height:5cm" placeholder="등급 판단 근거, 참고 사항 등을 자유롭게 작성하세요.">${escHtml(r.starMemo || '')}</textarea>
       </div>
     </div>
+    ${isDraft ? `<div class="card mt-16" style="margin-top:16px;border:2px dashed #e07000;background:#fffbf5">
+      <div style="font-size:13px;color:#e07000;font-weight:700;margin-bottom:8px">임시저장 상태</div>
+      <div style="font-size:12px;color:#888;margin-bottom:12px">아직 완료되지 않은 면접 평가입니다. 이어서 작성하거나 최종 완료 처리할 수 있습니다.</div>
+      <div class="flex gap-8">
+        <button class="btn btn-secondary btn-sm" onclick="openCIDraftForEdit(${idx})">✏️ 이어서 작성</button>
+        <button class="btn btn-primary btn-sm" onclick="completeCIDraftResult(${idx})">✅ 최종 완료</button>
+      </div>
+    </div>` : ''}
   `;
       nav('ci-result-detail');
+    }
+
+    function cirdExpandAll(qKeys) {
+      qKeys.forEach(k => cirdAccordionOpen.add(k));
+      openCIResultDetail(currentCIResultIdx);
+    }
+
+    function cirdCollapseAll() {
+      cirdAccordionOpen.clear();
+      openCIResultDetail(currentCIResultIdx);
     }
 
     function cirdSetFlag(idx, qId, subKey, flag) {
@@ -4727,7 +4996,7 @@ ${m.extractedText.substring(0, 3000)}
         r.results[qId].subs[subKey] = r.results[qId].subs[subKey] || {};
         r.results[qId].subs[subKey].flag = r.results[qId].subs[subKey].flag === flag ? '' : flag;
       }
-      localStorage.setItem('wm_ci_results', JSON.stringify(all));
+      saveCIResultsToStorage(all);
       openCIResultDetail(idx);
     }
 
@@ -4744,14 +5013,14 @@ ${m.extractedText.substring(0, 3000)}
         r.results[qId].subs[subKey] = r.results[qId].subs[subKey] || {};
         r.results[qId].subs[subKey].memo = value;
       }
-      localStorage.setItem('wm_ci_results', JSON.stringify(all));
+      saveCIResultsToStorage(all);
     }
 
     function cirdSetStarLevel(idx, level) {
       const all = loadCIResults();
       if (!all[idx]) return;
       all[idx].starLevel = level;
-      localStorage.setItem('wm_ci_results', JSON.stringify(all));
+      saveCIResultsToStorage(all);
       openCIResultDetail(idx);
     }
 
@@ -4759,7 +5028,7 @@ ${m.extractedText.substring(0, 3000)}
       const all = loadCIResults();
       if (!all[idx]) return;
       all[idx].starMemo = document.getElementById('cird-star-memo')?.value.trim() || '';
-      localStorage.setItem('wm_ci_results', JSON.stringify(all));
+      saveCIResultsToStorage(all);
       showToast('최종 등급 평가가 저장되었습니다.', 'success');
     }
 
@@ -4768,7 +5037,7 @@ ${m.extractedText.substring(0, 3000)}
       if (!all[idx]) return;
       const opinion = document.getElementById('cird-opinion')?.value.trim() || '';
       all[idx].opinion = opinion;
-      localStorage.setItem('wm_ci_results', JSON.stringify(all));
+      saveCIResultsToStorage(all);
       showToast('종합 의견이 저장되었습니다.', 'success');
     }
 
@@ -4778,7 +5047,7 @@ ${m.extractedText.substring(0, 3000)}
       if (!r) return;
       showConfirm('면접 결과 삭제', `"${r.name}" (${r.pos}) 면접 결과를 삭제하시겠습니까?`, () => {
         all.splice(idx, 1);
-        localStorage.setItem('wm_ci_results', JSON.stringify(all));
+        saveCIResultsToStorage(all);
         showToast('면접 결과가 삭제되었습니다.', 'success');
         renderCIResults();
       });
@@ -4793,7 +5062,7 @@ ${m.extractedText.substring(0, 3000)}
       const all = loadCIResults();
       if (!all.length) { showToast('삭제할 결과가 없습니다.', 'info'); return; }
       showConfirm('전체 삭제', `저장된 면접 결과 ${all.length}건을 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`, () => {
-        localStorage.removeItem('wm_ci_results');
+        saveCIResultsToStorage([]);
         showToast('전체 면접 결과가 삭제되었습니다.', 'success');
         renderCIResults();
       });
@@ -6251,16 +6520,58 @@ ${m.extractedText.substring(0, 3000)}
       sbSave('wm_iv_appts', interviewAppointments);
     }
 
+    function toggleAssignRejected() {
+      assignShowRejected = !assignShowRejected;
+      const btn = document.getElementById('assign-rejected-btn');
+      if (btn) {
+        btn.textContent = assignShowRejected ? '불합격 제외' : '불합격 포함';
+        btn.classList.toggle('btn-primary', assignShowRejected);
+        btn.classList.toggle('btn-secondary', !assignShowRejected);
+      }
+      renderAssignList();
+    }
+
     function renderAssignList() {
       loadInterviewAppointments();
       const filter = document.getElementById('assign-filter-status')?.value || '';
+      const yearFilter = document.getElementById('assign-filter-year')?.value || '';
+      const monthFilter = document.getElementById('assign-filter-month')?.value || '';
       const wrap = document.getElementById('assign-list-wrap');
       if (!wrap) return;
 
+      // 연도/월 셀렉트 옵션 동적 생성
+      const allDates = matchingData.map(m => m.date).filter(Boolean);
+      const years = [...new Set(allDates.map(d => d.slice(0, 4)))].sort().reverse();
+      const yearSel = document.getElementById('assign-filter-year');
+      if (yearSel) {
+        const curYear = yearSel.value;
+        yearSel.innerHTML = '<option value="">전체 연도</option>';
+        years.forEach(y => {
+          const opt = document.createElement('option');
+          opt.value = y; opt.textContent = y + '년';
+          if (y === curYear) opt.selected = true;
+          yearSel.appendChild(opt);
+        });
+      }
+      const monthSel = document.getElementById('assign-filter-month');
+      if (monthSel && monthSel.options.length <= 1) {
+        for (let m = 1; m <= 12; m++) {
+          const opt = document.createElement('option');
+          opt.value = String(m).padStart(2, '0');
+          opt.textContent = m + '월';
+          monthSel.appendChild(opt);
+        }
+      }
+
       let candidates = matchingData.map((m, i) => ({ ...m, _idx: i }))
-        .filter(m => !m.rejected && (m.procStatus === '과제/공통면접' || m.procStatus === '최종면접'));
+        .filter(m => (assignShowRejected ? true : !m.rejected) && (m.procStatus === '과제/공통면접' || m.procStatus === '최종면접'));
 
       if (filter) candidates = candidates.filter(m => m.procStatus === filter);
+      if (yearFilter) candidates = candidates.filter(m => (m.date || '').startsWith(yearFilter));
+      if (monthFilter) candidates = candidates.filter(m => {
+        const d = m.date || '';
+        return d.slice(5, 7) === monthFilter || d.slice(0, 7).endsWith('-' + monthFilter);
+      });
 
       if (!candidates.length) {
         wrap.innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">과제/공통면접 또는 최종면접 진행 중인 지원자가 없습니다.</div></div>';
@@ -6268,7 +6579,9 @@ ${m.extractedText.substring(0, 3000)}
       }
 
       wrap.innerHTML = candidates.map(m => {
-        const appts = interviewAppointments.filter(a => a.candidateIdx === m._idx);
+        const appts = interviewAppointments.filter(a =>
+          a.candidateId ? a.candidateId === m.id : a.candidateIdx === m._idx
+        );
         const apptHtml = appts.length
           ? appts.map(a => {
             const apptIdx = interviewAppointments.indexOf(a);
@@ -6281,9 +6594,10 @@ ${m.extractedText.substring(0, 3000)}
           : '<div style="font-size:12px;color:#aaa;margin-top:4px">미배정</div>';
         const procLabel = m.procStatus === '과제/공통면접' ? '과제/공통면접 진행' : '최종면접 진행';
         const badgeCls = m.procStatus === '과제/공통면접' ? 'badge-orange' : 'badge-blue2';
-        return `<div class="assign-card">
+        const rejectedBadge = m.rejected ? '<span class="badge badge-red" style="font-size:11px;vertical-align:middle">불합격</span>' : '';
+        return `<div class="assign-card" style="${m.rejected ? 'opacity:0.65;background:#fff8f8' : ''}">
       <div class="ac-info">
-        <div class="ac-name">${escHtml(m.applicant)} <span class="badge ${badgeCls}" style="font-size:11px;vertical-align:middle">${procLabel}</span></div>
+        <div class="ac-name">${escHtml(m.applicant)} <span class="badge ${badgeCls}" style="font-size:11px;vertical-align:middle">${procLabel}</span> ${rejectedBadge}</div>
         <div class="ac-meta">${escHtml(m.position)} · 분석점수 ${m.score}/5</div>
         ${apptHtml}
       </div>
@@ -6439,12 +6753,13 @@ ${m.extractedText.substring(0, 3000)}
       }
       const m = matchingData[candidateIdx];
       interviewAppointments.push({
-        candidateIdx,
+        candidateId: m?.id || '',      // 안정적 ID (배열 인덱스 대체)
+        candidateIdx,                  // 구형 데이터 하위 호환용
         candidateName: m?.applicant || '',
         candidatePosition: m?.position || '',
         procStatus: m?.procStatus || '',
         interviewers: ivs,
-        interviewer: ivs.join(', '),   // 하위 호환
+        interviewer: ivs.join(', '),
         date: assignSelectedDate,
         time: assignSelectedTime,
         type,

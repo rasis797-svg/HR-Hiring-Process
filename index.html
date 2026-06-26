@@ -649,13 +649,14 @@
                   <th>역량레벨</th>
                   <th>필수기술</th>
                   <th>결정적무기</th>
+                  <th>유입채널</th>
                   <th>분석일</th>
                   <th style="width:220px">작업</th>
                 </tr>
               </thead>
               <tbody id="matching-tbody">
                 <tr id="matching-empty">
-                  <td colspan="9">
+                  <td colspan="10">
                     <div class="empty-state">
                       <div class="empty-icon">🔍</div>
                       <div class="empty-text">분석된 이력서가 없습니다. 이력서를 업로드해보세요.</div>
@@ -958,13 +959,22 @@
 
           <!-- ── 탭2: 면접자 일정 배정 ── -->
           <div id="schedule-tab-assign" style="display:none">
-            <div class="flex items-center justify-between mb-16">
+            <div class="flex items-center justify-between mb-12 flex-wrap gap-8">
               <div class="text-sm text-gray">과제/공통면접 또는 최종면접 진행 상태 지원자의 면접 일정을 배정합니다.</div>
-              <select id="assign-filter-status" class="form-control" style="width:180px" onchange="renderAssignList()">
-                <option value="">전체 면접 단계</option>
-                <option value="과제/공통면접">과제/공통면접 진행</option>
-                <option value="최종면접">최종면접 진행</option>
-              </select>
+              <div class="flex gap-8 flex-wrap items-center">
+                <select id="assign-filter-year" class="form-control" style="width:90px" onchange="renderAssignList()">
+                  <option value="">전체 연도</option>
+                </select>
+                <select id="assign-filter-month" class="form-control" style="width:76px" onchange="renderAssignList()">
+                  <option value="">전체 월</option>
+                </select>
+                <button id="assign-rejected-btn" class="btn btn-secondary btn-sm" onclick="toggleAssignRejected()">불합격 포함</button>
+                <select id="assign-filter-status" class="form-control" style="width:180px" onchange="renderAssignList()">
+                  <option value="">전체 면접 단계</option>
+                  <option value="과제/공통면접">과제/공통면접 진행</option>
+                  <option value="최종면접">최종면접 진행</option>
+                </select>
+              </div>
             </div>
             <div id="assign-list-wrap">
               <div class="empty-state">
@@ -1365,6 +1375,11 @@
               <div class="page-subtitle">저장된 코어 면접 평가 결과를 조회합니다</div>
             </div>
             <div class="flex gap-8">
+              <select id="cir-filter-status" class="form-control" style="width:110px" onchange="renderCIResults()">
+                <option value="">전체 상태</option>
+                <option value="draft">작성중</option>
+                <option value="done">완료</option>
+              </select>
               <select id="cir-filter-verdict" class="form-control" style="width:130px" onchange="renderCIResults()">
                 <option value="">전체 결과</option>
                 <option value="합격">합격</option>
@@ -1381,6 +1396,7 @@
                   <th>지원자</th>
                   <th>포지션</th>
                   <th>트랙</th>
+                  <th>상태</th>
                   <th>판정</th>
                   <th>Red Flag</th>
                   <th>평가일시</th>
@@ -1389,7 +1405,7 @@
               </thead>
               <tbody id="cir-tbody">
                 <tr>
-                  <td colspan="7">
+                  <td colspan="8">
                     <div class="empty-state">
                       <div class="empty-icon">📋</div>
                       <div class="empty-text">저장된 면접 결과가 없습니다</div>
