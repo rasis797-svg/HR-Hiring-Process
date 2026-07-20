@@ -1395,7 +1395,27 @@ interview_questions.role_based는 6~10개, career_issues는 경력 이슈가 없
       // 5. 후행 쉼표 제거 (trailing comma) — , 뒤에 } 또는 ] 가 오는 경우
       str = str.replace(/,(\s*[}\]])/g, '$1');
 
-      // 6. 파싱 시도
+      // 6. 문자열 값 내부의 리터럴 개행/탭 이스케이프 (JSON은 문자열 안 실제 줄바꿈 불허)
+      str = (function escapeControlsInStrings(s) {
+        let out = '';
+        let inStr = false;
+        let esc = false;
+        for (let i = 0; i < s.length; i++) {
+          const c = s[i];
+          if (esc) { out += c; esc = false; continue; }
+          if (c === '\\' && inStr) { out += c; esc = true; continue; }
+          if (c === '"') { out += c; inStr = !inStr; continue; }
+          if (inStr) {
+            if (c === '\n') { out += '\\n'; continue; }
+            if (c === '\r') { out += '\\r'; continue; }
+            if (c === '\t') { out += '\\t'; continue; }
+          }
+          out += c;
+        }
+        return out;
+      })(str);
+
+      // 7. 파싱 시도
       try {
         return JSON.parse(str);
       } catch (e) {
