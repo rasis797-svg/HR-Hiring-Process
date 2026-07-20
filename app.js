@@ -340,11 +340,34 @@
         const history = loadBackupHistory();
         const isThrottled = !label && history[0] && (Date.now() - new Date(history[0].time).getTime()) < BACKUP_MIN_INTERVAL_MS;
         if (isThrottled) return false;
-        const snapshot = { time: new Date().toISOString(), label: label || '자동 백업', data: collectBackupPayload() };
+
+        // extractedText는 용량이 크므로 스냅샷에서 제외
+        const payload = collectBackupPayload();
+        if (Array.isArray(payload.wm_matching)) {
+          payload.wm_matching = payload.wm_matching.map(m => {
+            const { extractedText, ...rest } = m;
+            return rest;
+          });
+        }
+
+        const snapshot = { time: new Date().toISOString(), label: label || '자동 백업', data: payload };
         history.unshift(snapshot);
         while (history.length > BACKUP_HISTORY_MAX) history.pop();
-        localStorage.setItem(BACKUP_HISTORY_KEY, JSON.stringify(history));
-        return true;
+
+        // 할당량 초과 시 오래된 항목부터 제거 후 재시도
+        while (history.length > 0) {
+          try {
+            localStorage.setItem(BACKUP_HISTORY_KEY, JSON.stringify(history));
+            return true;
+          } catch (qe) {
+            if (qe.name === 'QuotaExceededError' || qe.code === 22) {
+              history.pop();
+            } else {
+              throw qe;
+            }
+          }
+        }
+        return false;
       } catch (e) {
         console.warn('로컬 백업 실패:', e);
         return false;
