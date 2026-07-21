@@ -367,44 +367,43 @@
       try { return JSON.parse(localStorage.getItem(BACKUP_HISTORY_KEY) || '[]'); } catch (e) { return []; }
     }
 
-    function takeLocalBackup(label) {
+    async function takeBackup(label) {
       try {
-        const history = loadBackupHistory();
+        const payload = collectBackupPayload();
+        // extractedText는 용량이 크므로 스냅샷에서 제외
+        try {
+          const arr = JSON.parse(payload.wm_matching);
+          payload.wm_matching = JSON.stringify(arr.map(({ extractedText, ...rest }) => rest));
+        } catch (e) {}
+
+        const snapshot = { time: new Date().toISOString(), label: label || '자동 백업', data: payload };
+        const history = await loadBackupHistory();
+
         const isThrottled = !label && history[0] && (Date.now() - new Date(history[0].time).getTime()) < BACKUP_MIN_INTERVAL_MS;
         if (isThrottled) return false;
 
-        // extractedText는 용량이 크므로 스냅샷에서 제외
-        const payload = collectBackupPayload();
-        if (Array.isArray(payload.wm_matching)) {
-          payload.wm_matching = payload.wm_matching.map(m => {
-            const { extractedText, ...rest } = m;
-            return rest;
-          });
-        }
-
-        const snapshot = { time: new Date().toISOString(), label: label || '자동 백업', data: payload };
         history.unshift(snapshot);
         while (history.length > BACKUP_HISTORY_MAX) history.pop();
 
-        // 할당량 초과 시 오래된 항목부터 제거 후 재시도
-        while (history.length > 0) {
-          try {
-            localStorage.setItem(BACKUP_HISTORY_KEY, JSON.stringify(history));
-            return true;
-          } catch (qe) {
-            if (qe.name === 'QuotaExceededError' || qe.code === 22) {
-              history.pop();
-            } else {
-              throw qe;
-            }
+        if (sbReady) {
+          // DB primary: Supabase에 저장 (localStorage quota 무관)
+          await sbSave(BACKUP_HISTORY_KEY, history);
+        } else {
+          // 오프라인 폴백: localStorage (할당량 초과 시 오래된 항목 제거 후 재시도)
+          while (history.length > 0) {
+            try { localStorage.setItem(BACKUP_HISTORY_KEY, JSON.stringify(history)); break; }
+            catch (qe) { if (qe.name === 'QuotaExceededError' || qe.code === 22) history.pop(); else throw qe; }
           }
         }
-        return false;
+        return true;
       } catch (e) {
-        console.warn('로컬 백업 실패:', e);
+        console.warn('백업 실패:', e);
         return false;
       }
     }
+
+    // 하위 호환 래퍼 (동기 컨텍스트에서 fire-and-forget으로 호출)
+    function takeLocalBackup(label) { takeBackup(label); }
 
     function manualBackupNow() {
       takeLocalBackup('수동 백업');
