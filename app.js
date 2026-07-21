@@ -5892,7 +5892,7 @@ ${m.extractedText.substring(0, 3000)}
       if (!r) return;
       showConfirm('과제 면접 결과 삭제', `"${r.name}" (${r.pos}) 과제 면접 결과를 삭제하시겠습니까?`, () => {
         all.splice(idx, 1);
-        localStorage.setItem('wm_qq_results', JSON.stringify(all));
+        saveQQResults(all);
         showToast('과제 면접 결과가 삭제되었습니다.', 'success');
         renderQQResults();
       });
@@ -5981,7 +5981,7 @@ ${m.extractedText.substring(0, 3000)}
       const all = loadQQResults();
       if (!all[idx]) return;
       all[idx].starLevel = level;
-      localStorage.setItem('wm_qq_results', JSON.stringify(all));
+      saveQQResults(all);
       openQQResultDetail(idx);
     }
 
@@ -5989,7 +5989,7 @@ ${m.extractedText.substring(0, 3000)}
       const all = loadQQResults();
       if (!all[idx]) return;
       all[idx].starMemo = document.getElementById('qqrd-star-memo')?.value.trim() || '';
-      localStorage.setItem('wm_qq_results', JSON.stringify(all));
+      saveQQResults(all);
       showToast('최종 등급 평가가 저장되었습니다.', 'success');
     }
 
@@ -6009,7 +6009,7 @@ ${m.extractedText.substring(0, 3000)}
       r.results[qId] = r.results[qId] || {};
       r.results[qId].judgment = r.results[qId].judgment === judgment ? '' : judgment;
       qqrdRecomputeVerdict(r);
-      localStorage.setItem('wm_qq_results', JSON.stringify(all));
+      saveQQResults(all);
       openQQResultDetail(idx);
     }
 
@@ -6021,7 +6021,7 @@ ${m.extractedText.substring(0, 3000)}
       r.results[qId] = r.results[qId] || {};
       r.results[qId].redFlagType = type;
       qqrdRecomputeVerdict(r);
-      localStorage.setItem('wm_qq_results', JSON.stringify(all));
+      saveQQResults(all);
     }
 
     function qqrdSaveMemo(idx, qId, val) {
@@ -6031,7 +6031,7 @@ ${m.extractedText.substring(0, 3000)}
       r.results = r.results || {};
       r.results[qId] = r.results[qId] || {};
       r.results[qId].memo = val;
-      localStorage.setItem('wm_qq_results', JSON.stringify(all));
+      saveQQResults(all);
     }
 
     function saveQQOpinion(idx) {
@@ -6039,7 +6039,7 @@ ${m.extractedText.substring(0, 3000)}
       if (!all[idx]) return;
       const opinion = document.getElementById('qqrd-opinion')?.value.trim() || '';
       all[idx].opinion = opinion;
-      localStorage.setItem('wm_qq_results', JSON.stringify(all));
+      saveQQResults(all);
       showToast('종합 의견이 저장되었습니다.', 'success');
     }
 
