@@ -357,7 +357,13 @@
     const BACKUP_HISTORY_MAX = 15;
     const BACKUP_MIN_INTERVAL_MS = 60 * 1000; // 같은 사유 없는 호출은 1분에 한 번만 스냅샷
 
-    function loadBackupHistory() {
+    async function loadBackupHistory() {
+      if (sbReady) {
+        try {
+          const { data } = await sbClient.from('app_data').select('value').eq('key', BACKUP_HISTORY_KEY).single();
+          if (data?.value && Array.isArray(data.value)) return data.value;
+        } catch (e) {}
+      }
       try { return JSON.parse(localStorage.getItem(BACKUP_HISTORY_KEY) || '[]'); } catch (e) { return []; }
     }
 
