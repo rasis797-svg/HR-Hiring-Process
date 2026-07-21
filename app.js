@@ -405,27 +405,27 @@
     // 하위 호환 래퍼 (동기 컨텍스트에서 fire-and-forget으로 호출)
     function takeLocalBackup(label) { takeBackup(label); }
 
-    function manualBackupNow() {
-      takeLocalBackup('수동 백업');
+    async function manualBackupNow() {
+      await takeBackup('수동 백업');
       renderBackupHistoryUI();
-      showToast('현재 상태를 로컬 백업에 저장했습니다.', 'success');
+      showToast('현재 상태를 클라우드 백업에 저장했습니다.', 'success');
     }
 
-    function restoreLocalBackup(idx) {
-      const history = loadBackupHistory();
+    async function restoreLocalBackup(idx) {
+      const history = await loadBackupHistory();
       const snap = history[idx];
       if (!snap) return;
       const timeTx = new Date(snap.time).toLocaleString('ko-KR');
       if (!confirm(`"${snap.label}" (${timeTx}) 백업으로 복원하시겠습니까?\n현재 데이터는 덮어씌워집니다.`)) return;
-      takeLocalBackup('복원 직전 자동 백업');
+      await takeBackup('복원 직전 자동 백업');
       applyBackupPayload(snap.data);
       renderBackupHistoryUI();
       showToast('백업으로 복원되었습니다.', 'success');
       saveData();
     }
 
-    function downloadLocalBackup(idx) {
-      const history = loadBackupHistory();
+    async function downloadLocalBackup(idx) {
+      const history = await loadBackupHistory();
       const snap = history[idx];
       if (!snap) return;
       const json = JSON.stringify(snap.data, null, 2);
@@ -438,20 +438,22 @@
       URL.revokeObjectURL(a.href);
     }
 
-    function deleteLocalBackup(idx) {
-      const history = loadBackupHistory();
+    async function deleteLocalBackup(idx) {
+      const history = await loadBackupHistory();
       if (!history[idx]) return;
       history.splice(idx, 1);
-      localStorage.setItem(BACKUP_HISTORY_KEY, JSON.stringify(history));
+      if (sbReady) await sbSave(BACKUP_HISTORY_KEY, history);
+      else { try { localStorage.setItem(BACKUP_HISTORY_KEY, JSON.stringify(history)); } catch (e) {} }
       renderBackupHistoryUI();
     }
 
-    function renderBackupHistoryUI() {
+    async function renderBackupHistoryUI() {
       const list = document.getElementById('backup-history-list');
       if (!list) return;
-      const history = loadBackupHistory();
+      list.innerHTML = '<div class="text-sm text-gray" style="padding:12px 0">불러오는 중...</div>';
+      const history = await loadBackupHistory();
       if (history.length === 0) {
-        list.innerHTML = '<div class="text-sm text-gray" style="padding:12px 0">저장된 자동 백업이 없습니다.</div>';
+        list.innerHTML = '<div class="text-sm text-gray" style="padding:12px 0">저장된 백업이 없습니다.</div>';
         return;
       }
       list.innerHTML = history.map((snap, i) => {
