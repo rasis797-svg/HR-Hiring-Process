@@ -250,13 +250,26 @@
       if (t === 'data') renderBackupHistoryUI();
     }
 
-    // ── 백업 대상 localStorage 키 전체 ──
-    const BACKUP_KEYS = ['wm_sheets', 'wm_matching', 'wm_audit', 'wm_users', 'wm_schedule', 'wm_interviewers', 'wm_iv_appts', 'wm_iv_settings', 'wm_ci_results', 'wm_ai_model'];
+    // ── 백업 대상 키 전체 (localStorage 캐시 및 복원에 사용) ──
+    const BACKUP_KEYS = ['wm_sheets', 'wm_matching', 'wm_audit', 'wm_users', 'wm_schedule', 'wm_interviewers', 'wm_iv_appts', 'wm_iv_settings', 'wm_ci_results', 'wm_qq_results', 'wm_ai_model'];
 
     function collectBackupPayload() {
-      const payload = { version: 2, exportedAt: new Date().toISOString() };
-      BACKUP_KEYS.forEach(k => { payload[k] = localStorage.getItem(k) || (k === 'wm_iv_settings' ? '{}' : k === 'wm_ai_model' ? '' : '[]'); });
-      return payload;
+      // 주 데이터는 메모리에서 직접 읽음 (localStorage 용량 부족 시에도 최신 상태 보장)
+      return {
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        wm_sheets: JSON.stringify(sheetsData),
+        wm_matching: JSON.stringify(matchingData),
+        wm_audit: JSON.stringify(auditData),
+        wm_users: JSON.stringify(usersData),
+        wm_schedule: localStorage.getItem('wm_schedule') || '[]',
+        wm_interviewers: localStorage.getItem('wm_interviewers') || '[]',
+        wm_iv_appts: localStorage.getItem('wm_iv_appts') || '[]',
+        wm_iv_settings: localStorage.getItem('wm_iv_settings') || '{}',
+        wm_ci_results: localStorage.getItem('wm_ci_results') || '[]',
+        wm_qq_results: localStorage.getItem('wm_qq_results') || '[]',
+        wm_ai_model: aiModel || ''
+      };
     }
 
     function applyBackupPayload(payload) {
@@ -266,6 +279,19 @@
       loadInterviewSettings();
       loadInterviewAppointments();
       aiModel = localStorage.getItem('wm_ai_model') || 'claude-sonnet-4-6';
+      // 복원된 데이터를 Supabase(DB primary)에도 즉시 반영
+      if (cloudSyncDone) {
+        sbSave('wm_sheets', sheetsData);
+        sbSave('wm_matching', matchingData);
+        sbSave('wm_audit', auditData);
+        sbSave('wm_users', usersData);
+        sbSave('wm_schedule', scheduleData);
+        sbSave('wm_interviewers', interviewersPool);
+        sbSave('wm_iv_appts', interviewAppointments);
+        sbSave('wm_iv_settings', interviewSettings);
+        sbSave('wm_ci_results', loadCIResults());
+        sbSave('wm_qq_results', loadQQResults());
+      }
       renderDashboard(); renderSheets(); renderMatching(); renderPositions();
       renderReports(); renderAuditLog(); renderUsers(); syncPositionDropdowns();
     }
