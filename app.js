@@ -2613,6 +2613,7 @@ ${m.extractedText.substring(0, 3000)}
           await sbSave('wm_iv_appts', interviewAppointments);
           await sbSave('wm_iv_settings', interviewSettings);
           await sbSave('wm_ci_results', loadCIResults());
+          await sbSave('wm_qq_results', loadQQResults());
           showToast('클라우드 초기 업로드 완료', 'success');
           cloudSyncDone = true;
           return;
@@ -2620,8 +2621,8 @@ ${m.extractedText.substring(0, 3000)}
         const map = {};
         data.forEach(row => { map[row.key] = row.value; });
 
-        // 클라우드 값으로 덮어쓰기 전, 현재 로컬 상태를 백업 (클라우드 데이터가 비정상적으로 비어있는 경우를 위한 안전장치)
-        takeLocalBackup('클라우드 동기화 전 자동 백업');
+        // 클라우드 값으로 덮어쓰기 전, 현재 로컬 상태를 백업 (Supabase에 저장)
+        await takeBackup('클라우드 동기화 전 자동 백업');
 
         if (map['wm_sheets'])       { sheetsData = map['wm_sheets'];             localStorage.setItem('wm_sheets', JSON.stringify(sheetsData)); }
         if (map['wm_matching'])     {
@@ -2639,6 +2640,7 @@ ${m.extractedText.substring(0, 3000)}
         if (map['wm_iv_appts'])     { interviewAppointments = map['wm_iv_appts']; localStorage.setItem('wm_iv_appts', JSON.stringify(interviewAppointments)); }
         if (map['wm_iv_settings'])  { interviewSettings = map['wm_iv_settings'];  localStorage.setItem('wm_iv_settings', JSON.stringify(interviewSettings)); }
         if (map['wm_ci_results'])   { localStorage.setItem('wm_ci_results', JSON.stringify(map['wm_ci_results'])); }
+        if (map['wm_qq_results'])   { localStorage.setItem('wm_qq_results', JSON.stringify(map['wm_qq_results'])); }
 
         renderDashboard(); renderSheets(); renderMatching(); renderPositions();
         renderReports(); renderAuditLog(); renderUsers(); syncPositionDropdowns();
@@ -5823,6 +5825,11 @@ ${m.extractedText.substring(0, 3000)}
 
     function loadQQResults() {
       try { return JSON.parse(localStorage.getItem('wm_qq_results') || '[]'); } catch (e) { return []; }
+    }
+
+    function saveQQResults(arr) {
+      try { localStorage.setItem('wm_qq_results', JSON.stringify(arr)); } catch (e) {}
+      if (cloudSyncDone) sbSave('wm_qq_results', arr);
     }
 
     function renderQQResults() {
