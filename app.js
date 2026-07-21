@@ -5765,7 +5765,7 @@ ${m.extractedText.substring(0, 3000)}
       let saved = [];
       try { saved = JSON.parse(localStorage.getItem('wm_qq_results') || '[]'); } catch (e) { saved = []; }
       saved.unshift(record);
-      localStorage.setItem('wm_qq_results', JSON.stringify(saved));
+      saveQQResults(saved);
       addAuditLog('우성 관리자', '과제 면접 결과 저장', `${qq.name} (${qq.pos}) → ${verdict}`);
       showToast('과제 면접 결과가 저장되었습니다. "과제 면접 결과" 메뉴에서 확인하세요.', 'success');
     }
@@ -5880,7 +5880,7 @@ ${m.extractedText.substring(0, 3000)}
       const all = loadQQResults();
       if (!all.length) { showToast('삭제할 결과가 없습니다.', 'info'); return; }
       showConfirm('전체 삭제', `저장된 과제 면접 결과 ${all.length}건을 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`, () => {
-        localStorage.removeItem('wm_qq_results');
+        saveQQResults([]);
         showToast('전체 과제 면접 결과가 삭제되었습니다.', 'success');
         renderQQResults();
       });
