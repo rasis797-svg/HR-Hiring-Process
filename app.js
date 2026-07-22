@@ -273,7 +273,7 @@
     }
 
     function applyBackupPayload(payload) {
-      BACKUP_KEYS.forEach(k => { if (payload[k] !== undefined) localStorage.setItem(k, payload[k]); });
+      BACKUP_KEYS.forEach(k => { if (payload[k] !== undefined) { try { localStorage.setItem(k, payload[k]); } catch (e) { console.warn(`localStorage 복원 실패 (${k}):`, e); } } });
       loadData();
       loadScheduleData();
       loadInterviewSettings();
@@ -2640,17 +2640,17 @@ ${m.extractedText.substring(0, 3000)}
         // 클라우드 값으로 덮어쓰기 전, 현재 로컬 상태를 백업 (Supabase에 저장)
         await takeBackup('클라우드 동기화 전 자동 백업');
 
-        if (map['wm_sheets'])       { sheetsData = map['wm_sheets'];             localStorage.setItem('wm_sheets', JSON.stringify(sheetsData)); }
+        if (map['wm_sheets'])       { sheetsData = map['wm_sheets'];             safeLocalSet('wm_sheets', sheetsData); }
         if (map['wm_matching'])     {
           matchingData = map['wm_matching'];
           // 클라우드에서 내려온 데이터도 id 마이그레이션
           let migrated = false;
           matchingData = matchingData.map(m => { if (!m.id) { migrated = true; return { ...m, id: generateId() }; } return m; });
-          localStorage.setItem('wm_matching', JSON.stringify(matchingData));
+          safeLocalSet('wm_matching', matchingData);
           if (migrated) sbSave('wm_matching', matchingData);
         }
-        if (map['wm_audit'])        { auditData = map['wm_audit'];                localStorage.setItem('wm_audit', JSON.stringify(auditData)); }
-        if (map['wm_users'])        { usersData = map['wm_users'];                localStorage.setItem('wm_users', JSON.stringify(usersData)); }
+        if (map['wm_audit'])        { auditData = map['wm_audit'];                safeLocalSet('wm_audit', auditData); }
+        if (map['wm_users'])        { usersData = map['wm_users'];                safeLocalSet('wm_users', usersData); }
         if (map['wm_schedule'])     { scheduleData = map['wm_schedule'];          localStorage.setItem('wm_schedule', JSON.stringify(scheduleData)); }
         if (map['wm_interviewers']) { interviewersPool = map['wm_interviewers'];  localStorage.setItem('wm_interviewers', JSON.stringify(interviewersPool)); }
         if (map['wm_iv_appts'])     { interviewAppointments = map['wm_iv_appts']; localStorage.setItem('wm_iv_appts', JSON.stringify(interviewAppointments)); }
@@ -2668,11 +2668,42 @@ ${m.extractedText.substring(0, 3000)}
       }
     }
 
+    // localStorage는 용량이 5~10MB로 제한적이라 무제한으로 커지는 데이터(특히 이력서 원문)를
+    // 그대로 담다 보면 QuotaExceededError가 발생한다. Supabase가 실질적인 DB(용량 여유 큼)이므로
+    // 로컬 저장은 "베스트 에포트 캐시"로 취급해 실패해도 앱 흐름(백업/클라우드 동기화)을 막지 않는다.
+    let localQuotaWarned = false;
+    function safeLocalSet(key, value) {
+      try {
+        localStorage.setItem(key, JSON.stringify(value));
+        return true;
+      } catch (e) {
+        if (!(e && (e.name === 'QuotaExceededError' || e.code === 22))) {
+          console.warn(`localStorage 저장 실패 (${key}):`, e);
+          return false;
+        }
+        // wm_matching은 이력서 원문(extractedText)이 용량의 대부분을 차지하므로,
+        // 이를 제외한 축약 버전으로 재시도 (전체 원문은 Supabase에는 그대로 유지됨)
+        if (key === 'wm_matching' && Array.isArray(value)) {
+          try {
+            localStorage.setItem(key, JSON.stringify(value.map(({ extractedText, ...rest }) => rest)));
+            console.warn('localStorage 용량 초과 — 이력서 원문은 로컬 캐시에서 제외하고 저장했습니다 (클라우드에는 원문 그대로 저장됨).');
+            return true;
+          } catch (e2) { /* 축약 버전도 실패하면 아래에서 완전히 포기 */ }
+        }
+        console.warn(`localStorage 용량 초과 (${key}) — 로컬 캐시 저장을 생략합니다. 클라우드 동기화는 계속 진행됩니다.`, e);
+        if (!localQuotaWarned) {
+          localQuotaWarned = true;
+          showToast('브라우저 저장 공간이 가득 차 로컬 캐시를 일부 생략했습니다. 클라우드 저장은 정상 진행됩니다.', 'error');
+        }
+        return false;
+      }
+    }
+
     function saveData() {
-      localStorage.setItem('wm_sheets', JSON.stringify(sheetsData));
-      localStorage.setItem('wm_matching', JSON.stringify(matchingData));
-      localStorage.setItem('wm_audit', JSON.stringify(auditData));
-      localStorage.setItem('wm_users', JSON.stringify(usersData));
+      safeLocalSet('wm_sheets', sheetsData);
+      safeLocalSet('wm_matching', matchingData);
+      safeLocalSet('wm_audit', auditData);
+      safeLocalSet('wm_users', usersData);
       takeLocalBackup();
       if (!cloudSyncDone) return; // 초기 클라우드 동기화가 끝나기 전에는 클라우드에 쓰지 않음 (빈 데이터로 덮어쓰는 사고 방지)
       sbSave('wm_sheets', sheetsData);
@@ -2695,7 +2726,7 @@ ${m.extractedText.substring(0, 3000)}
           if (!m.id) { migrated = true; return { ...m, id: generateId() }; }
           return m;
         });
-        if (migrated) localStorage.setItem('wm_matching', JSON.stringify(matchingData));
+        if (migrated) safeLocalSet('wm_matching', matchingData);
       } catch (e) { matchingData = []; }
       try { auditData = JSON.parse(localStorage.getItem('wm_audit')) || []; } catch (e) { auditData = []; }
       try { usersData = JSON.parse(localStorage.getItem('wm_users')) || []; } catch (e) { usersData = []; }
