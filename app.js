@@ -367,6 +367,8 @@
       try { return JSON.parse(localStorage.getItem(BACKUP_HISTORY_KEY) || '[]'); } catch (e) { return []; }
     }
 
+    const BACKUP_HISTORY_MAX_BYTES = 4 * 1024 * 1024; // Supabase REST 요청 크기 제한 여유분
+
     async function takeBackup(label) {
       try {
         const payload = collectBackupPayload();
@@ -374,6 +376,14 @@
         try {
           const arr = JSON.parse(payload.wm_matching);
           payload.wm_matching = JSON.stringify(arr.map(({ extractedText, ...rest }) => rest));
+        } catch (e) {}
+        // 첨부파일 원본(fileData)은 용량이 크므로 스냅샷에서 제외 (파일명/타입은 보존)
+        try {
+          const sheets = JSON.parse(payload.wm_sheets);
+          payload.wm_sheets = JSON.stringify(sheets.map(s => {
+            if (!s.assignments || !s.assignments.length) return s;
+            return { ...s, assignments: s.assignments.map(({ fileData, ...rest }) => rest) };
+          }));
         } catch (e) {}
 
         const snapshot = { time: new Date().toISOString(), label: label || '자동 백업', data: payload };
@@ -384,6 +394,8 @@
 
         history.unshift(snapshot);
         while (history.length > BACKUP_HISTORY_MAX) history.pop();
+        // 위 필터링 후에도 전체 용량이 클 수 있으므로, 오래된 스냅샷부터 추가로 제거해 REST 업로드 실패를 방지
+        while (history.length > 1 && JSON.stringify(history).length > BACKUP_HISTORY_MAX_BYTES) history.pop();
 
         if (sbReady) {
           // DB primary: Supabase에 저장 (localStorage quota 무관)
@@ -2593,8 +2605,12 @@ ${m.extractedText.substring(0, 3000)}
     async function sbSave(key, data) {
       if (!sbReady) return;
       try {
-        await sbClient.from('app_data').upsert({ key, value: data, updated_at: new Date().toISOString() }, { onConflict: 'key' });
-      } catch (e) { console.warn('Supabase 저장 오류:', key, e); }
+        const { error } = await sbClient.from('app_data').upsert({ key, value: data, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+        if (error) {
+          console.error('Supabase 저장 오류:', key, error);
+          showToast(`클라우드 저장 실패 (${key}): ${error.message || error.code || '알 수 없는 오류'}`, 'error');
+        }
+      } catch (e) { console.error('Supabase 저장 예외:', key, e); showToast(`클라우드 저장 실패 (${key})`, 'error'); }
     }
 
     async function loadFromSupabase() {
