@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>복지기금 운영 효율화 프로그램</title>
+<link rel="stylesheet" href="style.css" />
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<header class="hdr">
+  <span class="logo">복지기금 운영 효율화</span>
+  <span class="sub">금전출납부 → 결산자료 자동 작성</span>
+  <span class="sp"></span>
+  <select id="year-sel" onchange="WF.changeYear(this.value)"></select>
+  <button class="btn sm" onclick="WF.importXlsx()">엑셀 가져오기</button>
+  <button class="btn sm" onclick="WF.exportXlsx()">엑셀 내보내기</button>
+  <button class="btn sm" onclick="window.print()">인쇄</button>
+</header>
+
+<div class="shell">
+  <nav class="side">
+    <div class="grp">입력</div>
+    <a data-page="dashboard" onclick="WF.nav('dashboard')">대시보드</a>
+    <a data-page="cashbook" onclick="WF.nav('cashbook')">금전출납부</a>
+    <a data-page="loans"    onclick="WF.nav('loans')">대출 내역서</a>
+    <a data-page="settings" onclick="WF.nav('settings')">기금 정보 · 이월</a>
+    <div class="grp">자동 생성</div>
+    <a data-page="ledger"   onclick="WF.nav('ledger')">계정별 원장</a>
+    <a data-page="closing"  onclick="WF.nav('closing')">결산서</a>
+    <a data-page="report"   onclick="WF.nav('report')">운영상황 보고서</a>
+    <div class="grp">점검</div>
+    <a data-page="verify"   onclick="WF.nav('verify')">검증 결과</a>
+    <a data-page="help"     onclick="WF.nav('help')">사용 안내</a>
+  </nav>
+
+  <main class="main">
+
+    <!-- ═══ 대시보드 ═══ -->
+    <section class="page" id="pg-dashboard">
+      <h1>대시보드</h1>
+      <p class="lead" id="dash-sub"></p>
+      <div class="stats" id="dash-stats"></div>
+      <div class="row">
+        <div class="card">
+          <h2>월별 자금 흐름</h2>
+          <div id="dash-flow"></div>
+        </div>
+        <div class="card">
+          <h2>기금 사용 내역 (당기)</h2>
+          <div id="dash-use"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>검증 요약</h2>
+        <div id="dash-check"></div>
+      </div>
+    </section>
+
+    <!-- ═══ 금전출납부 ═══ -->
+    <section class="page" id="pg-cashbook">
+      <h1>금전출납부</h1>
+      <p class="lead">매월 거래 명세만 입력하면 예입·인출 행, 월계·누계, 그리고 모든 원장과 결산서가 자동으로 작성됩니다.</p>
+      <div class="months" id="cb-months"></div>
+      <div class="toolbar">
+        <button class="btn pri" onclick="WF.addEntry()">+ 거래 추가</button>
+        <button class="btn" onclick="WF.bulkPaste()">여러 줄 붙여넣기</button>
+        <button class="btn" onclick="WF.copyPrevMonth()">전월 정기항목 복사</button>
+        <span class="sp"></span>
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px">
+          <input type="checkbox" id="cb-preview" onchange="WF.render()" /> 출납부 서식으로 보기
+        </label>
+      </div>
+      <div class="card tight scroll" id="cb-body"></div>
+      <p class="hint">
+        적요를 입력하면 유형·소속·관련자가 자동 분류됩니다(노란 배경 = 확인 필요).
+        목적사업비는 <b>수혜자수</b>를 입력해야 보고서 인원란이 채워집니다.
+      </p>
+    </section>
+
+    <!-- ═══ 대출 내역서 ═══ -->
+    <section class="page" id="pg-loans">
+      <h1>대출 내역서</h1>
+      <p class="lead">사업장별 대출 잔액 명세입니다. 합계는 대출금 원장 잔액과 자동 대조됩니다.</p>
+      <div class="toolbar">
+        <button class="btn pri" onclick="WF.addLoan()">+ 차주 추가</button>
+        <button class="btn" onclick="WF.syncLoansFromEntries()">출납부에서 신규 대출 반영</button>
+        <span class="sp"></span>
+        <span id="loan-match"></span>
+      </div>
+      <div class="card tight scroll" id="loan-body"></div>
+    </section>
+
+    <!-- ═══ 설정 ═══ -->
+    <section class="page" id="pg-settings">
+      <h1>기금 정보 · 전기이월</h1>
+      <p class="lead">연 1회만 입력하면 되는 항목입니다. 전기이월 잔액은 전년도 결산서의 기말잔액을 그대로 옮겨 적습니다.</p>
+      <div class="row">
+        <div class="card">
+          <h2>기금법인 (보고서 ①~⑪)</h2>
+          <div id="set-info"></div>
+        </div>
+        <div class="card">
+          <h2>전기이월 잔액</h2>
+          <div id="set-open"></div>
+          <h2 style="margin-top:18px">기본재산 (보고서 ⑫~⑳)</h2>
+          <div id="set-basic"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>데이터 관리</h2>
+        <div class="toolbar">
+          <button class="btn" onclick="WF.exportJson()">백업 파일 저장(JSON)</button>
+          <button class="btn" onclick="WF.importJson()">백업 파일 불러오기</button>
+          <button class="btn" onclick="WF.loadDemo()">2025년도 예시 데이터 불러오기</button>
+          <button class="btn danger" onclick="WF.resetYear()">해당 연도 초기화</button>
+        </div>
+        <p class="hint">데이터는 브라우저(localStorage)에 연도별로 저장됩니다. 다른 PC로 옮길 때는 백업 파일을 사용하세요.</p>
+      </div>
+    </section>
+
+    <!-- ═══ 원장 ═══ -->
+    <section class="page" id="pg-ledger">
+      <h1>계정별 원장</h1>
+      <p class="lead">금전출납부에서 자동 전기(轉記)되었습니다. 직접 입력하는 항목은 없습니다.</p>
+      <div class="toolbar" id="lg-tabs"></div>
+      <div class="card tight scroll" id="lg-body"></div>
+    </section>
+
+    <!-- ═══ 결산서 ═══ -->
+    <section class="page" id="pg-closing">
+      <h1>결산서</h1>
+      <p class="lead">합계잔액시산표 · 재무상태표 · 손익계산서가 자동 작성됩니다.</p>
+      <div class="card tight scroll"><h2 style="padding:14px 16px 8px">합계잔액시산표</h2><div id="cl-trial"></div></div>
+      <div class="row">
+        <div class="card tight scroll"><h2 style="padding:14px 16px 8px">재무상태표</h2><div id="cl-bs"></div></div>
+        <div class="card tight scroll"><h2 style="padding:14px 16px 8px">손익계산서</h2><div id="cl-pl"></div></div>
+      </div>
+    </section>
+
+    <!-- ═══ 보고서 ═══ -->
+    <section class="page" id="pg-report">
+      <h1>사내근로복지기금법인 운영상황 보고서</h1>
+      <p class="lead">근로복지기본법 시행규칙 별지 제15호서식 &lt;개정 2021. 6. 9.&gt; · 단위: 천원, 명</p>
+      <div class="toolbar">
+        <button class="btn" onclick="WF.copyReport()">항목값 표로 복사</button>
+        <button class="btn" onclick="window.print()">인쇄 / PDF 저장</button>
+      </div>
+      <div class="card scroll" id="rp-body"></div>
+    </section>
+
+    <!-- ═══ 검증 ═══ -->
+    <section class="page" id="pg-verify">
+      <h1>검증 결과</h1>
+      <p class="lead">제출 전 반드시 모든 항목이 통과(초록)여야 합니다.</p>
+      <div class="card" id="vf-body"></div>
+      <div class="card">
+        <h2>월별 대사(對査)</h2>
+        <div class="scroll" id="vf-months"></div>
+      </div>
+    </section>
+
+    <!-- ═══ 도움말 ═══ -->
+    <section class="page" id="pg-help">
+      <h1>사용 안내</h1>
+      <div class="card" id="help-body"></div>
+    </section>
+
+  </main>
+</div>
+
+<input type="file" id="file-input" style="display:none" />
+<div id="modal-root"></div>
+
+<script src="rules.js"></script>
+<script src="engine.js"></script>
+<script src="demo.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
