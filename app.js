@@ -1,6 +1,11 @@
     // ── State ──
     let currentPage = '';
     let currentUserRole = '';
+    let currentUser = null;      // 로그인한 app_users 행 (감사 로그 작성자로 쓰인다)
+
+    function currentUserName() {
+      return (currentUser && (currentUser.name || currentUser.email)) || '알 수 없음';
+    }
 
     // ── 사이드바 그룹 접기/펼치기 ──
     function toggleNavGroup(name) {
@@ -70,48 +75,62 @@
       document.getElementById(id).style.display = '';
     }
 
-    // 관리자 계정 설정
-    const ADMIN_ACCOUNTS = [
-      { email: 'wshr@woosung.kr', pw: 'wsfeed1101!', name: '우성 관리자', role: '시스템 관리자', initials: 'WS' }
-    ];
+    // 로그인은 Supabase Auth 만 사용한다.
+    // (하드코딩 관리자 계정은 소스에 평문 비밀번호가 노출되어 제거했다.)
 
     async function doLogin() {
       const email = document.getElementById('login-email').value.trim();
       const pw = document.getElementById('login-pw').value;
       if (!email || !pw) { showToast('이메일과 비밀번호를 입력하세요.', 'error'); return; }
+      if (!sbReady) { showToast('서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.', 'error'); return; }
 
-      const user = ADMIN_ACCOUNTS.find(a => a.email === email && a.pw === pw);
-      if (user) {
-        localStorage.setItem('wm_logged_in', user.email);
-        applyLogin(user);
-        showToast(`${user.name}님, 환영합니다.`, 'success');
-        return;
-      }
-
-      if (!sbReady) { showToast('이메일 또는 비밀번호가 올바르지 않습니다.', 'error'); return; }
+      const btn = document.querySelector('#login-panel .btn-primary');
+      if (btn) btn.disabled = true;
       try {
         const { data, error } = await sbClient.auth.signInWithPassword({ email, password: pw });
         if (error || !data.user) { showToast('이메일 또는 비밀번호가 올바르지 않습니다.', 'error'); return; }
-
-        let u = usersData.find(x => x.email.toLowerCase() === email.toLowerCase());
-        if (!u) {
-          const meta = data.user.user_metadata || {};
-          u = { id: data.user.id, name: meta.name || email, email, role: meta.role || 'HR 관리자', status: '활성', lastLogin: '—' };
-          usersData.push(u);
-        }
-        if (u.status === '비활성') {
-          showToast('비활성화된 계정입니다. 관리자에게 문의하세요.', 'error');
-          await sbClient.auth.signOut();
-          return;
-        }
-        u.status = '활성';
-        u.lastLogin = new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-        saveData();
-        applyLoginAsUser(u);
-        showToast(`${u.name}님, 환영합니다.`, 'success');
+        await enterApp(data.user);
       } catch (e) {
         showToast('이메일 또는 비밀번호가 올바르지 않습니다.', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
       }
+    }
+
+    /* 인증 성공 후 공통 진입 경로.
+     * 1) app_users 행에 auth_uid 를 연결한다 (이게 되어야 RLS 정책이 통과한다)
+     * 2) 그 다음에야 데이터를 조회한다 (로그인 전에는 아무것도 못 읽는다)
+     * 3) 다른 사용자의 변경을 받기 위해 실시간 구독을 건다 */
+    async function enterApp(authUser) {
+      let me = null;
+      try {
+        me = await DB.linkCurrentUser();
+      } catch (e) {
+        showToast(`계정 확인 실패: ${e.message || e}`, 'error');
+        await sbClient.auth.signOut();
+        return false;
+      }
+
+      if (!me) { showToast('계정 정보를 찾을 수 없습니다. 관리자에게 문의하세요.', 'error'); await sbClient.auth.signOut(); return false; }
+      if (me.status === '비활성') {
+        showToast('비활성화된 계정입니다. 관리자에게 문의하세요.', 'error');
+        await sbClient.auth.signOut();
+        return false;
+      }
+
+      await loadFromSupabase();
+
+      let u = usersData.find(x => (x.email || '').toLowerCase() === (me.email || '').toLowerCase());
+      if (!u) { u = me; usersData.push(u); }
+      Object.assign(u, { id: me.id, authUid: me.authUid, role: me.role, status: '활성' });
+      u.lastLogin = new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+      currentUser = u;
+      applyLoginAsUser(u);
+      saveData();
+      startRealtime();
+      showToast(`${u.name}님, 환영합니다.`, 'success');
+      return true;
     }
 
     function applyLogin(user) {
@@ -136,18 +155,20 @@
       if (!allowed && aiTab.classList.contains('active')) switchAdminTab('users');
     }
 
-    function doLogout() {
-      localStorage.removeItem('wm_logged_in');
-      localStorage.removeItem('wm_invited_user');
+    async function doLogout() {
+      stopRealtime();
+      currentUser = null;
+      currentUserRole = '';
+      if (sbReady) { try { await sbClient.auth.signOut(); } catch (e) {} }
       document.getElementById('app-screen').style.display = 'none';
       document.getElementById('auth-screen').style.display = '';
       showToast('로그아웃되었습니다.', 'info');
     }
 
     function applyLoginAsUser(u) {
+      currentUser = u;
       const initials = (u.name || u.email).slice(0, 2).toUpperCase();
       applyLogin({ email: u.email, name: u.name, role: u.role, initials });
-      localStorage.setItem('wm_invited_user', u.email);
     }
 
     async function changePassword() {
@@ -205,19 +226,7 @@
         history.replaceState(null, '', window.location.pathname);
         if (error || !data.user) { showToast('로그인 링크가 만료되었거나 올바르지 않습니다.', 'error'); return false; }
 
-        const email = data.user.email;
-        let u = usersData.find(x => x.email.toLowerCase() === email.toLowerCase());
-        if (!u) {
-          const meta = data.user.user_metadata || {};
-          u = { id: data.user.id, name: meta.name || email, email, role: meta.role || 'HR 관리자', status: '활성', lastLogin: '—' };
-          usersData.push(u);
-        }
-        u.status = '활성';
-        u.lastLogin = new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-        saveData();
-        applyLoginAsUser(u);
-        showToast(`${u.name}님, 환영합니다.`, 'success');
-        return true;
+        return await enterApp(data.user);
       } catch (e) {
         showToast(`로그인 처리 실패: ${e.message}`, 'error');
         return false;
@@ -360,8 +369,8 @@
     async function loadBackupHistory() {
       if (sbReady) {
         try {
-          const { data } = await sbClient.from('app_data').select('value').eq('key', BACKUP_HISTORY_KEY).single();
-          if (data?.value && Array.isArray(data.value)) return data.value;
+          const rows = await DB.loadBackups();
+          if (rows && rows.length) return rows;
         } catch (e) {}
       }
       try { return JSON.parse(localStorage.getItem(BACKUP_HISTORY_KEY) || '[]'); } catch (e) { return []; }
@@ -398,8 +407,8 @@
         while (history.length > 1 && JSON.stringify(history).length > BACKUP_HISTORY_MAX_BYTES) history.pop();
 
         if (sbReady) {
-          // DB primary: Supabase에 저장 (localStorage quota 무관)
-          await sbSave(BACKUP_HISTORY_KEY, history);
+          // 스냅샷 1건만 INSERT 한다 (예전처럼 히스토리 배열 전체를 다시 쓰지 않는다)
+          await DB.addBackup(snapshot, BACKUP_HISTORY_MAX);
         } else {
           // 오프라인 폴백: localStorage (할당량 초과 시 오래된 항목 제거 후 재시도)
           while (history.length > 0) {
@@ -452,10 +461,14 @@
 
     async function deleteLocalBackup(idx) {
       const history = await loadBackupHistory();
-      if (!history[idx]) return;
-      history.splice(idx, 1);
-      if (sbReady) await sbSave(BACKUP_HISTORY_KEY, history);
-      else { try { localStorage.setItem(BACKUP_HISTORY_KEY, JSON.stringify(history)); } catch (e) {} }
+      const snap = history[idx];
+      if (!snap) return;
+      if (sbReady && snap.id) {
+        await DB.deleteBackup(snap.id);
+      } else {
+        history.splice(idx, 1);
+        try { localStorage.setItem(BACKUP_HISTORY_KEY, JSON.stringify(history)); } catch (e) {}
+      }
       renderBackupHistoryUI();
     }
 
@@ -567,6 +580,7 @@
 
       const levels = getLevelsFromForm('new');
       const sheet = {
+        id: generateId(),
         name: positionName, team: team || '—', reportTo: reportTo || '—',
         headcount: headcount || '1',
         created: today, modified: today, version: 1,
@@ -591,7 +605,7 @@
       checkLevelEmpty('new');
       switchTab('direct');
 
-      addAuditLog('우성 관리자', '설계시트 생성', positionName);
+      addAuditLog(currentUserName(), '설계시트 생성', positionName);
       showToast(`"${positionName}" 설계시트가 저장되었습니다.`, 'success');
       setTimeout(() => nav('sheets'), 600);
     }
@@ -743,7 +757,7 @@
       renderSheetViewGrid(s);
       renderSheets();
       saveData();
-      addAuditLog('우성 관리자', '설계시트 수정', s.name + ` v${s.version}`);
+      addAuditLog(currentUserName(), '설계시트 수정', s.name + ` v${s.version}`);
       showToast(`변경 사항이 저장되었습니다. (v${s.version} 생성)`, 'success');
       toggleSheetEdit();
     }
@@ -759,7 +773,7 @@
         renderPositions();
         syncPositionDropdowns();
         renderDashboard();
-        addAuditLog('우성 관리자', '설계시트 삭제', name);
+        addAuditLog(currentUserName(), '설계시트 삭제', name);
         showToast(`"${name}" 설계시트가 삭제되었습니다.`, 'success');
         nav('sheets');
       });
@@ -1114,7 +1128,7 @@
       const idx = matchingData.length - 1;
       saveData();
       document.getElementById('stat-resumes').textContent = matchingData.length;
-      addAuditLog('우성 관리자', '매칭 분석 실행', `${applicant} (${position})`);
+      addAuditLog(currentUserName(), '매칭 분석 실행', `${applicant} (${position})`);
 
       // 폼 초기화
       clearResumeFile(); resumeExtractedText = '';
@@ -1233,7 +1247,7 @@
       if (old === val) { filterMatching(); return; }
       m.applicant = val;
       saveData();
-      addAuditLog('우성 관리자', '지원자 이름 수정', `${old} → ${val}`);
+      addAuditLog(currentUserName(), '지원자 이름 수정', `${old} → ${val}`);
       showToast(`이름이 "${val}"(으)로 수정되었습니다.`, 'success');
       filterMatching();
     }
@@ -1244,7 +1258,7 @@
       const old = m.channel || '미지정';
       m.channel = value;
       saveData();
-      addAuditLog('우성 관리자', '유입채널 수정', `${m.applicant} · ${old} → ${value || '미지정'}`);
+      addAuditLog(currentUserName(), '유입채널 수정', `${m.applicant} · ${old} → ${value || '미지정'}`);
     }
 
     function deleteApplicant(idx) {
@@ -1259,7 +1273,7 @@
           else if (currentMatchIdx > idx) currentMatchIdx--;
           saveData();
           filterMatching(); renderDashboard(); renderPositions(); renderReports(); syncPositionDropdowns();
-          addAuditLog('우성 관리자', '지원자 삭제', `${m.applicant} (${m.position})`);
+          addAuditLog(currentUserName(), '지원자 삭제', `${m.applicant} (${m.position})`);
           showToast(`"${m.applicant}" 분석 데이터가 삭제되었습니다.`, 'success');
         }
       );
@@ -1732,7 +1746,7 @@ interview_questions.role_based는 6~10개, career_issues는 경력 이슈가 없
           document.getElementById('rd-generating').style.display = 'none';
           renderReportBody(m, aiResult.interview_questions, sheet);
           renderReports();
-          addAuditLog('우성 관리자', '면접 리포트 생성 (AI)', `${m.applicant} (${m.position})`);
+          addAuditLog(currentUserName(), '면접 리포트 생성 (AI)', `${m.applicant} (${m.position})`);
           return;
         } catch (e) {
           document.getElementById('rd-generating').style.display = 'none';
@@ -1747,7 +1761,7 @@ interview_questions.role_based는 6~10개, career_issues는 경력 이슈가 없
       saveData();
       renderReportBody(m, questions, sheet);
       renderReports();
-      addAuditLog('우성 관리자', '면접 리포트 생성 (키워드)', `${m.applicant} (${m.position})`);
+      addAuditLog(currentUserName(), '면접 리포트 생성 (키워드)', `${m.applicant} (${m.position})`);
     }
 
     // 분석 결과 기반 질문 생성 (AI 없을 때)
@@ -2599,72 +2613,121 @@ ${m.extractedText.substring(0, 3000)}
       try {
         sbClient = supabase.createClient(SB_URL, SB_KEY);
         sbReady = true;
+        DB.init(sbClient);
       } catch (e) { console.warn('Supabase 초기화 실패:', e); }
     }
+
+    /* 예전에는 app_data 에 배열 전체를 통째로 upsert 했다. 그래서 두 사람이 동시에
+     * 작업하면 나중에 저장한 쪽이 상대 작업을 통으로 덮어썼다.
+     * 이제는 db.js 가 마지막으로 서버에서 본 상태와 비교해 "바뀐 행"만 쓴다. */
+    const SB_LABELS = {
+      wm_sheets: '설계시트', wm_matching: '지원자', wm_users: '사용자', wm_audit: '감사 로그',
+      wm_schedule: '면접관 일정', wm_interviewers: '면접관', wm_iv_appts: '면접 배정',
+      wm_iv_settings: '면접 유형', wm_ci_results: '코어 면접 결과', wm_qq_results: '과제 면접 결과'
+    };
 
     async function sbSave(key, data) {
       if (!sbReady) return;
       try {
-        const { error } = await sbClient.from('app_data').upsert({ key, value: data, updated_at: new Date().toISOString() }, { onConflict: 'key' });
-        if (error) {
-          console.error('Supabase 저장 오류:', key, error);
-          showToast(`클라우드 저장 실패 (${key}): ${error.message || error.code || '알 수 없는 오류'}`, 'error');
-        }
-      } catch (e) { console.error('Supabase 저장 예외:', key, e); showToast(`클라우드 저장 실패 (${key})`, 'error'); }
+        await DB.sync(key, data);
+      } catch (e) {
+        console.error('클라우드 저장 오류:', key, e);
+        showToast(`클라우드 저장 실패 (${SB_LABELS[key] || key}): ${e.message || '알 수 없는 오류'}`, 'error');
+      }
     }
 
     async function loadFromSupabase() {
       if (!sbReady) { cloudSyncDone = true; return; }
       try {
-        const { data, error } = await sbClient.from('app_data').select('key, value');
-        if (error) { console.warn('Supabase 로드 오류:', error); cloudSyncDone = true; return; }
-        if (!data || data.length === 0) {
-          // 첫 실행: 현재 localStorage 데이터를 Supabase로 업로드
-          await sbSave('wm_sheets', sheetsData);
-          await sbSave('wm_matching', matchingData);
-          await sbSave('wm_audit', auditData);
-          await sbSave('wm_users', usersData);
-          await sbSave('wm_schedule', scheduleData);
-          await sbSave('wm_interviewers', interviewersPool);
-          await sbSave('wm_iv_appts', interviewAppointments);
-          await sbSave('wm_iv_settings', interviewSettings);
-          await sbSave('wm_ci_results', loadCIResults());
-          await sbSave('wm_qq_results', loadQQResults());
+        const hasData = await DB.hasNormalizedData();
+
+        if (!hasData) {
+          // 정규화 테이블이 비어 있는 첫 실행: 현재 로컬 데이터를 행 단위로 올린다.
+          // (기존 app_data 는 그대로 두고 002 마이그레이션 SQL 로 옮기는 것이 정석 경로다.
+          //  이 분기는 로컬에만 데이터가 있는 신규 환경을 위한 것이다.)
+          await DB.seed({
+            wm_sheets: sheetsData, wm_matching: matchingData, wm_audit: auditData,
+            wm_users: usersData, wm_schedule: scheduleData,
+            wm_interviewers: interviewersPool, wm_iv_appts: interviewAppointments,
+            wm_iv_settings: interviewSettings,
+            wm_ci_results: loadCIResults(), wm_qq_results: loadQQResults()
+          });
           showToast('클라우드 초기 업로드 완료', 'success');
           cloudSyncDone = true;
           return;
         }
-        const map = {};
-        data.forEach(row => { map[row.key] = row.value; });
 
-        // 클라우드 값으로 덮어쓰기 전, 현재 로컬 상태를 백업 (Supabase에 저장)
+        // 클라우드 값으로 덮어쓰기 전, 현재 로컬 상태를 백업
         await takeBackup('클라우드 동기화 전 자동 백업');
 
-        if (map['wm_sheets'])       { sheetsData = map['wm_sheets'];             safeLocalSet('wm_sheets', sheetsData); }
-        if (map['wm_matching'])     {
-          matchingData = map['wm_matching'];
-          // 클라우드에서 내려온 데이터도 id 마이그레이션
-          let migrated = false;
-          matchingData = matchingData.map(m => { if (!m.id) { migrated = true; return { ...m, id: generateId() }; } return m; });
-          safeLocalSet('wm_matching', matchingData);
-          if (migrated) sbSave('wm_matching', matchingData);
-        }
-        if (map['wm_audit'])        { auditData = map['wm_audit'];                safeLocalSet('wm_audit', auditData); }
-        if (map['wm_users'])        { usersData = map['wm_users'];                safeLocalSet('wm_users', usersData); }
-        if (map['wm_schedule'])     { scheduleData = map['wm_schedule'];          localStorage.setItem('wm_schedule', JSON.stringify(scheduleData)); }
-        if (map['wm_interviewers']) { interviewersPool = map['wm_interviewers'];  localStorage.setItem('wm_interviewers', JSON.stringify(interviewersPool)); }
-        if (map['wm_iv_appts'])     { interviewAppointments = map['wm_iv_appts']; localStorage.setItem('wm_iv_appts', JSON.stringify(interviewAppointments)); }
-        if (map['wm_iv_settings'])  { interviewSettings = map['wm_iv_settings'];  localStorage.setItem('wm_iv_settings', JSON.stringify(interviewSettings)); }
-        if (map['wm_ci_results'])   { localStorage.setItem('wm_ci_results', JSON.stringify(map['wm_ci_results'])); }
-        if (map['wm_qq_results'])   { localStorage.setItem('wm_qq_results', JSON.stringify(map['wm_qq_results'])); }
+        const remote = await DB.loadAll();
+        if (!remote) { cloudSyncDone = true; return; }
 
-        renderDashboard(); renderSheets(); renderMatching(); renderPositions();
-        renderReports(); renderAuditLog(); renderUsers(); syncPositionDropdowns();
+        applyRemoteSnapshot(remote);
         showToast('클라우드 데이터 동기화 완료', 'success');
       } catch (e) {
-        console.warn('Supabase 로드 실패:', e);
+        console.warn('클라우드 로드 실패:', e);
+        showToast(`클라우드 로드 실패: ${e.message || e}`, 'error');
       } finally {
         cloudSyncDone = true;
+      }
+    }
+
+    /* 서버에서 받은 행들을 화면이 쓰는 메모리 배열에 반영한다.
+     * 객체 모양은 기존과 동일해서 렌더링 코드는 손대지 않는다. */
+    function applyRemoteSnapshot(remote) {
+      if (remote.wm_sheets)   { sheetsData = remote.wm_sheets;     safeLocalSet('wm_sheets', sheetsData); }
+      if (remote.wm_matching) { matchingData = remote.wm_matching; safeLocalSet('wm_matching', matchingData); }
+      if (remote.wm_audit)    { auditData = remote.wm_audit;       safeLocalSet('wm_audit', auditData); }
+      if (remote.wm_users)    { usersData = remote.wm_users;       safeLocalSet('wm_users', usersData); }
+      if (remote.wm_schedule)     { scheduleData = remote.wm_schedule;                localStorage.setItem('wm_schedule', JSON.stringify(scheduleData)); }
+      if (remote.wm_interviewers) { interviewersPool = remote.wm_interviewers;        localStorage.setItem('wm_interviewers', JSON.stringify(interviewersPool)); }
+      if (remote.wm_iv_appts)     { interviewAppointments = remote.wm_iv_appts;       localStorage.setItem('wm_iv_appts', JSON.stringify(interviewAppointments)); }
+      if (remote.wm_iv_settings && remote.wm_iv_settings.types && remote.wm_iv_settings.types.length) {
+        interviewSettings = remote.wm_iv_settings;
+        localStorage.setItem('wm_iv_settings', JSON.stringify(interviewSettings));
+      }
+      if (remote.wm_ci_results) { localStorage.setItem('wm_ci_results', JSON.stringify(remote.wm_ci_results)); }
+      if (remote.wm_qq_results) { localStorage.setItem('wm_qq_results', JSON.stringify(remote.wm_qq_results)); }
+
+      if (currentUser) {
+        const mine = usersData.find(x => (x.email || '').toLowerCase() === (currentUser.email || '').toLowerCase());
+        if (mine) { currentUser = mine; currentUserRole = mine.role || ''; updateAdminTabVisibility(); }
+      }
+
+      renderDashboard(); renderSheets(); renderMatching(); renderPositions();
+      renderReports(); renderAuditLog(); renderUsers(); syncPositionDropdowns();
+      if (currentPage === 'schedule') renderCalendar();
+    }
+
+    /* 다른 사용자가 바꾼 내용을 자동으로 끌어온다.
+     * 내가 편집 중인 화면을 갑자기 뒤엎지 않도록, 모달이 열려 있으면 잠시 미룬다. */
+    let realtimeChannel = null;
+    let realtimeRefreshPending = false;
+
+    function startRealtime() {
+      if (!sbReady || realtimeChannel) return;
+      realtimeChannel = DB.subscribe(() => {
+        if (document.querySelector('.modal.active, .modal[style*="flex"]')) {
+          realtimeRefreshPending = true;
+          return;
+        }
+        pullRemoteChanges();
+      });
+    }
+
+    function stopRealtime() {
+      if (realtimeChannel && sbClient) { try { sbClient.removeChannel(realtimeChannel); } catch (e) {} }
+      realtimeChannel = null;
+    }
+
+    async function pullRemoteChanges() {
+      if (!sbReady || !cloudSyncDone) return;
+      try {
+        const remote = await DB.loadAll();
+        if (remote) applyRemoteSnapshot(remote);
+      } catch (e) {
+        console.warn('실시간 갱신 실패:', e);
       }
     }
 
@@ -2700,6 +2763,11 @@ ${m.extractedText.substring(0, 3000)}
     }
 
     function saveData() {
+      // 로컬에 쓰기 전에 id를 확정한다 — 서버 행 식별자와 동일해야 중복 저장이 없다
+      DB.ensureIds('wm_sheets', sheetsData);
+      DB.ensureIds('wm_matching', matchingData);
+      DB.ensureIds('wm_audit', auditData);
+      DB.ensureIds('wm_users', usersData);
       safeLocalSet('wm_sheets', sheetsData);
       safeLocalSet('wm_matching', matchingData);
       safeLocalSet('wm_audit', auditData);
@@ -2717,7 +2785,17 @@ ${m.extractedText.substring(0, 3000)}
     }
 
     function loadData() {
-      try { sheetsData = JSON.parse(localStorage.getItem('wm_sheets')) || []; } catch (e) { sheetsData = []; }
+      try {
+        sheetsData = JSON.parse(localStorage.getItem('wm_sheets')) || [];
+        // 설계시트에는 원래 id가 없어 배열 인덱스로만 참조됐다. 동시 편집 시
+        // 인덱스가 밀려 엉뚱한 시트를 고치게 되므로 여기서 안정적 id를 부여한다.
+        let sheetMigrated = false;
+        sheetsData = sheetsData.map(sh => {
+          if (!sh.id) { sheetMigrated = true; return { ...sh, id: generateId() }; }
+          return sh;
+        });
+        if (sheetMigrated) safeLocalSet('wm_sheets', sheetsData);
+      } catch (e) { sheetsData = []; }
       try {
         matchingData = JSON.parse(localStorage.getItem('wm_matching')) || [];
         // 기존 데이터에 id 없으면 마이그레이션
@@ -2768,7 +2846,7 @@ ${m.extractedText.substring(0, 3000)}
       if (!u) return;
       u.role = role;
       saveData();
-      addAuditLog('우성 관리자', '역할 변경', `${u.email} → ${role}`);
+      addAuditLog(currentUserName(), '역할 변경', `${u.email} → ${role}`);
       showToast(`${u.name}님의 역할이 "${role}"로 변경되었습니다.`, 'success');
     }
 
@@ -2778,7 +2856,7 @@ ${m.extractedText.substring(0, 3000)}
       u.status = '비활성';
       saveData();
       renderUsers();
-      addAuditLog('우성 관리자', '계정 비활성화', u.email);
+      addAuditLog(currentUserName(), '계정 비활성화', u.email);
       showToast('계정이 비활성화되었습니다.', 'success');
     }
 
@@ -2788,7 +2866,7 @@ ${m.extractedText.substring(0, 3000)}
       u.status = '활성';
       saveData();
       renderUsers();
-      addAuditLog('우성 관리자', '계정 활성화', u.email);
+      addAuditLog(currentUserName(), '계정 활성화', u.email);
       showToast('계정이 활성화되었습니다.', 'success');
     }
 
@@ -2799,7 +2877,7 @@ ${m.extractedText.substring(0, 3000)}
         usersData = usersData.filter(x => x.id !== id);
         saveData();
         renderUsers();
-        addAuditLog('우성 관리자', '사용자 삭제', u.email);
+        addAuditLog(currentUserName(), '사용자 삭제', u.email);
         showToast('사용자가 삭제되었습니다.', 'success');
       });
     }
@@ -2818,7 +2896,7 @@ ${m.extractedText.substring(0, 3000)}
           showToast(`초대 재전송 실패: ${result.error?.message || '알 수 없는 오류'}`, 'error');
           return;
         }
-        addAuditLog('우성 관리자', '초대 재전송', u.email);
+        addAuditLog(currentUserName(), '초대 재전송', u.email);
         showToast(`${u.name}(${u.email})에게 초대 메일을 재전송했습니다.`, 'success');
       } catch (e) {
         showToast(`초대 재전송 실패: ${e.message}`, 'error');
@@ -2837,7 +2915,7 @@ ${m.extractedText.substring(0, 3000)}
           showToast(`로그인 메일 재전송 실패: ${error.message}`, 'error');
           return;
         }
-        addAuditLog('우성 관리자', '로그인 메일 재전송', u.email);
+        addAuditLog(currentUserName(), '로그인 메일 재전송', u.email);
         showToast(`${u.name}(${u.email})에게 로그인 메일을 재전송했습니다.`, 'success');
       } catch (e) {
         showToast(`로그인 메일 재전송 실패: ${e.message}`, 'error');
@@ -3181,7 +3259,7 @@ ${m.extractedText.substring(0, 3000)}
       saveData();
       closeAssignmentForm();
       renderAssignmentList();
-      addAuditLog('우성 관리자', '과제 등록/수정', `${s.name} · ${title}`);
+      addAuditLog(currentUserName(), '과제 등록/수정', `${s.name} · ${title}`);
       showToast('과제가 저장되었습니다.', 'success');
     }
 
@@ -3241,7 +3319,7 @@ ${m.extractedText.substring(0, 3000)}
           renderUsers();
           inputs.forEach(i => i.value = '');
           closeModal('modal-add-user');
-          addAuditLog('우성 관리자', '계정 재활성화', email);
+          addAuditLog(currentUserName(), '계정 재활성화', email);
           showToast(`${name}(${email}) 계정을 다시 활성화했습니다.`, 'success');
         } else {
           showToast(`${email}은 이미 등록된 계정입니다. 사용자 관리 목록에서 확인하세요.`, 'error');
@@ -3273,7 +3351,7 @@ ${m.extractedText.substring(0, 3000)}
         renderUsers();
         inputs.forEach(i => i.value = '');
         closeModal('modal-add-user');
-        addAuditLog('우성 관리자', '사용자 등록', email);
+        addAuditLog(currentUserName(), '사용자 등록', email);
         showToast(`${name}(${email})에게 초대 메일이 발송되었습니다.`, 'success');
       } catch (e) {
         showToast(`초대 메일 발송 실패: ${e.message}`, 'error');
@@ -3307,20 +3385,20 @@ ${m.extractedText.substring(0, 3000)}
       u.permissions = perms;
       saveData();
       closeModal('modal-user-perms');
-      addAuditLog('우성 관리자', '권한 변경', u.email);
+      addAuditLog(currentUserName(), '권한 변경', u.email);
       showToast(`${u.name}님의 권한이 저장되었습니다.`, 'success');
     }
 
     function confirmDeactivate() {
       showConfirm('계정 비활성화', '해당 사용자의 계정을 비활성화하시겠습니까?', () => {
-        addAuditLog('우성 관리자', '계정 비활성화', '사용자');
+        addAuditLog(currentUserName(), '계정 비활성화', '사용자');
         showToast('계정이 비활성화되었습니다.', 'success');
       });
     }
 
     function confirmDeleteUser() {
       showConfirm('사용자 삭제', '해당 사용자를 완전히 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.', () => {
-        addAuditLog('우성 관리자', '사용자 삭제', '사용자');
+        addAuditLog(currentUserName(), '사용자 삭제', '사용자');
         showToast('사용자가 삭제되었습니다.', 'success');
       });
     }
@@ -4682,7 +4760,7 @@ ${m.extractedText.substring(0, 3000)}
         saved.unshift(record);
       }
       saveCIResultsToStorage(saved);
-      addAuditLog('우성 관리자', '면접 결과 저장', `${ci.name} (${ci.pos}) → ${verdict}`);
+      addAuditLog(currentUserName(), '면접 결과 저장', `${ci.name} (${ci.pos}) → ${verdict}`);
       showToast('면접 결과가 저장되었습니다. "코어 면접 결과" 메뉴에서 확인하세요.', 'success');
     }
 
@@ -4769,7 +4847,7 @@ ${m.extractedText.substring(0, 3000)}
       all[idx].opinion = opinion;
       delete all[idx].ciState;
       saveCIResultsToStorage(all);
-      addAuditLog('우성 관리자', '면접 결과 최종 완료', `${all[idx].name} (${all[idx].pos})`);
+      addAuditLog(currentUserName(), '면접 결과 최종 완료', `${all[idx].name} (${all[idx].pos})`);
       showToast('면접 평가가 최종 완료되었습니다.', 'success');
       openCIResultDetail(idx);
     }
@@ -4852,6 +4930,7 @@ ${m.extractedText.substring(0, 3000)}
     }
 
     function saveCIResultsToStorage(arr) {
+      DB.ensureIds('wm_ci_results', arr);
       localStorage.setItem('wm_ci_results', JSON.stringify(arr));
       if (cloudSyncDone) sbSave('wm_ci_results', arr);
     }
@@ -5813,7 +5892,7 @@ ${m.extractedText.substring(0, 3000)}
       try { saved = JSON.parse(localStorage.getItem('wm_qq_results') || '[]'); } catch (e) { saved = []; }
       saved.unshift(record);
       saveQQResults(saved);
-      addAuditLog('우성 관리자', '과제 면접 결과 저장', `${qq.name} (${qq.pos}) → ${verdict}`);
+      addAuditLog(currentUserName(), '과제 면접 결과 저장', `${qq.name} (${qq.pos}) → ${verdict}`);
       showToast('과제 면접 결과가 저장되었습니다. "과제 면접 결과" 메뉴에서 확인하세요.', 'success');
     }
 
@@ -5875,6 +5954,7 @@ ${m.extractedText.substring(0, 3000)}
     }
 
     function saveQQResults(arr) {
+      DB.ensureIds('wm_qq_results', arr);
       try { localStorage.setItem('wm_qq_results', JSON.stringify(arr)); } catch (e) {}
       if (cloudSyncDone) sbSave('wm_qq_results', arr);
     }
@@ -6105,6 +6185,8 @@ ${m.extractedText.substring(0, 3000)}
     }
 
     function saveScheduleData() {
+      DB.ensureIds('wm_schedule', scheduleData);
+      DB.ensureIds('wm_interviewers', interviewersPool);
       localStorage.setItem('wm_schedule', JSON.stringify(scheduleData));
       localStorage.setItem('wm_interviewers', JSON.stringify(interviewersPool));
       sbSave('wm_schedule', scheduleData);
@@ -6669,6 +6751,7 @@ ${m.extractedText.substring(0, 3000)}
     }
 
     function saveInterviewAppointments() {
+      DB.ensureIds('wm_iv_appts', interviewAppointments);
       localStorage.setItem('wm_iv_appts', JSON.stringify(interviewAppointments));
       sbSave('wm_iv_appts', interviewAppointments);
     }
@@ -7068,7 +7151,6 @@ ${m.extractedText.substring(0, 3000)}
       loadScheduleData();
       loadInterviewSettings();
       loadInterviewAppointments();
-      takeLocalBackup('앱 시작 시 자동 백업');
       renderDashboard();
       renderSheets();
       renderMatching();
@@ -7079,22 +7161,26 @@ ${m.extractedText.substring(0, 3000)}
       syncPositionDropdowns();
       initNavGroups();
 
-      const savedEmail = localStorage.getItem('wm_logged_in');
-      if (savedEmail) {
-        const user = ADMIN_ACCOUNTS.find(a => a.email === savedEmail);
-        if (user) applyLogin(user);
-      }
-      const savedInvitedEmail = localStorage.getItem('wm_invited_user');
-      if (savedInvitedEmail) {
-        const u = usersData.find(x => x.email === savedInvitedEmail && x.status === '활성');
-        if (u) applyLoginAsUser(u);
-      }
-
-      handleAuthRedirect();
-
-      // Supabase에서 최신 데이터 풀기 (비동기)
-      loadFromSupabase();
+      // 초대/매직링크로 돌아온 경우가 우선. 아니면 기존 세션을 복원한다.
+      // 어느 쪽이든 enterApp() 안에서 로그인 확인 → 데이터 조회 순으로 진행된다.
+      handleAuthRedirect().then(handled => {
+        if (!handled) restoreSession();
+      });
     });
+
+    /* 새로고침해도 로그인이 유지되도록 Supabase 세션을 복원한다.
+     * (예전에는 localStorage 에 이메일만 저장해 두고 통과시켰다 — 인증이 아니었다.) */
+    async function restoreSession() {
+      if (!sbReady) return false;
+      try {
+        const { data } = await sbClient.auth.getSession();
+        if (!data.session || !data.session.user) return false;
+        return await enterApp(data.session.user);
+      } catch (e) {
+        console.warn('세션 복원 실패:', e);
+        return false;
+      }
+    }
 
 
 
