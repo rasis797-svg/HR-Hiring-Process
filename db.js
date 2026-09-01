@@ -558,8 +558,14 @@
 
     if (rows.length) {
       work = work.then(function () {
+        // append-only 테이블(감사 로그, 백업 스냅샷)은 수정 정책이 아예 없다.
+        // addAuditLog() 처럼 같은 saveData() 흐름이 겹쳐 호출되면 같은 id를 두 번
+        // upsert하게 되는데, 보통 테이블은 두 번째 호출이 무해한 재기록으로 통과하지만
+        // append-only 테이블은 UPDATE 정책이 없어 "new row violates row-level security
+        // policy (USING expression)" 로 그대로 실패한다. ignoreDuplicates로 두 번째
+        // 시도를 조용히 무시해 이 경합을 근본적으로 없앤다.
         return sb.from(ad.table)
-          .upsert(rows, { onConflict: ad.idField || 'id' })
+          .upsert(rows, { onConflict: ad.idField || 'id', ignoreDuplicates: !!ad.appendOnly })
           .then(throwOnError('upsert ' + ad.table));
       });
     }

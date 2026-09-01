@@ -126,8 +126,7 @@
       u.lastLogin = new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 
       currentUser = u;
-      applyLoginAsUser(u);
-      saveData();
+      applyLoginAsUser(u); // 내부에서 addAuditLog('로그인')를 호출하고, 그 안에서 이미 saveData()가 한 번 실행된다 — 여기서 또 호출하면 같은 항목을 중복 upsert하게 된다
       startRealtime();
       showToast(`${u.name}님, 환영합니다.`, 'success');
       return true;
