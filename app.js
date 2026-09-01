@@ -147,12 +147,20 @@
       nav('dashboard');
     }
 
+    // 사용자 관리 화면의 등록/역할변경/권한설정/활성화/삭제는 전부 시스템 관리자만
+    // 쓸 수 있는 DB 트리거로 막혀 있다 (sql/003_rls.sql: guard_app_users_privileged_columns).
+    // 다른 역할이 탭에 들어가면 시도할 때마다 "역할·상태·권한·이메일은 시스템 관리자만
+    // 변경할 수 있습니다" 오류만 반복되므로, 애초에 탭 자체를 숨긴다.
     function updateAdminTabVisibility() {
       const aiTab = document.getElementById('atab-ai');
-      if (!aiTab) return;
+      const usersTab = document.getElementById('atab-users');
+      if (!aiTab || !usersTab) return;
       const allowed = currentUserRole === '시스템 관리자';
       aiTab.style.display = allowed ? '' : 'none';
-      if (!allowed && aiTab.classList.contains('active')) switchAdminTab('users');
+      usersTab.style.display = allowed ? '' : 'none';
+      if (!allowed && (aiTab.classList.contains('active') || usersTab.classList.contains('active'))) {
+        switchAdminTab('audit');
+      }
     }
 
     async function doLogout() {
