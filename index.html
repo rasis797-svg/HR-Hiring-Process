@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>채용 프로세스 - 채용 프로세스 최적화 솔루션</title>
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <!-- ═══════════════════ LOGIN ═══════════════════ -->
+  <div id="auth-screen">
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <div class="auth-logo">채용 프로세스</div>
+        <div class="auth-subtitle">채용 프로세스 최적화 & 인재 매칭 솔루션</div>
+
+        <div id="login-panel">
+          <div class="form-group mb-16">
+            <label class="form-label">이메일</label>
+            <input class="form-control" type="email" id="login-email" placeholder="이메일을 입력하세요" />
+          </div>
+          <div class="form-group mb-20">
+            <label class="form-label">비밀번호</label>
+            <input class="form-control" type="password" id="login-pw" placeholder="비밀번호를 입력하세요" />
+          </div>
+          <button class="btn btn-primary btn-full" onclick="doLogin()">로그인</button>
+          <div style="text-align:center;margin-top:14px;">
+            <a class="link" onclick="showPanel('forgot-panel')">비밀번호를 잊으셨나요?</a>
+          </div>
+        </div>
+
+        <div id="forgot-panel" style="display:none">
+          <p class="text-gray mb-16" style="font-size:13px;">등록된 이메일 주소를 입력하시면 로그인 링크를 재발송해 드립니다.</p>
+          <div class="form-group mb-20">
+            <label class="form-label">이메일</label>
+            <input class="form-control" type="email" id="forgot-email" placeholder="이메일을 입력하세요" />
+          </div>
+          <button class="btn btn-primary btn-full" onclick="sendLoginLink()">로그인 링크 재발송</button>
+          <div style="text-align:center;margin-top:14px;">
+            <a class="link" onclick="showPanel('login-panel')">로그인으로 돌아가기</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ APP ═══════════════════ -->
+  <div id="app-screen" class="app" style="display:none">
+
+    <!-- Header -->
+    <header class="header">
+      <span class="header-logo" onclick="nav('dashboard')">채용 프로세스</span>
+      <div class="header-spacer"></div>
+      <div class="header-search" style="position:relative">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+          <circle cx="9.17" cy="9.17" r="5.42" stroke="#999" stroke-width="1.5" />
+          <path d="M16.25 16.25L13.33 13.33" stroke="#999" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        <input type="search" id="global-search" placeholder="지원자·포지션 검색" autocomplete="off"
+          oninput="globalSearch(this.value)" onkeydown="globalSearchKeydown(event)"
+          onfocus="if(this.value) globalSearch(this.value)" onblur="setTimeout(()=>closeSearchDrop(),200)" />
+        <div id="search-drop"
+          style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid #d0d0d0;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:300;max-height:360px;overflow-y:auto;min-width:320px">
+        </div>
+      </div>
+      <div class="header-avatar" id="header-avatar" onclick="nav('account')">WS</div>
+    </header>
+
+    <div class="body">
+      <!-- Sidebar -->
+      <nav class="sidebar">
+        <span class="sidebar-label">메뉴</span>
+        <div class="nav-item" data-nav="dashboard" onclick="nav('dashboard')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+          </svg>
+          대시보드
+        </div>
+        <div class="nav-item" data-nav="positions" onclick="nav('positions')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
+            <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" />
+          </svg>
+          포지션
+        </div>
+        <div class="nav-item" data-nav="sheets" onclick="nav('sheets')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+          </svg>
+          설계시트
+        </div>
+        <div class="nav-item" data-nav="matching" onclick="nav('matching')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          매칭분석
+        </div>
+        <div class="nav-item" data-nav="reports" onclick="nav('reports')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <line x1="10" y1="9" x2="8" y2="9" />
+          </svg>
+          면접질문리포트
+        </div>
+        <div class="nav-group-toggle" style="margin-top:16px" onclick="toggleNavGroup('interview')">
+          <span class="nav-group-toggle-main">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+            </svg>
+            면접
+          </span>
+          <svg id="nav-group-chevron-interview" class="nav-group-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
+        <div id="nav-group-interview">
+          <div class="nav-item nav-item-sub" data-nav="mini-quest" onclick="nav('mini-quest')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2l3 6 6 1-4.5 4.5 1 6L12 17l-5.5 2.5 1-6L3 9l6-1z" />
+            </svg>
+            과제 면접
+          </div>
+          <div class="nav-item nav-item-sub" data-nav="qq-results" onclick="nav('qq-results')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 11l3 3L22 4" />
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+            </svg>
+            과제 면접 결과
+          </div>
+          <div class="nav-item nav-item-sub" data-nav="core-interview" onclick="nav('core-interview')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 00-3-3.87" />
+              <path d="M16 3.13a4 4 0 010 7.75" />
+            </svg>
+            코어 면접
+          </div>
+          <div class="nav-item nav-item-sub" data-nav="ci-results" onclick="nav('ci-results')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 11l3 3L22 4" />
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+            </svg>
+            코어 면접 결과
+          </div>
+        </div>
+        <div class="nav-item" data-nav="schedule" onclick="nav('schedule')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+          면접 일정
+        </div>
+        <span class="sidebar-label" style="margin-top:16px">관리</span>
+        <div class="nav-item" data-nav="admin" onclick="nav('admin')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14" />
+          </svg>
+          설정
+        </div>
+        <div class="nav-item" data-nav="account" onclick="nav('account')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+          내 계정
+        </div>
+      </nav>
+
+      <!-- Pages -->
+      <main class="main">
+
+        <!-- ── Dashboard ── -->
+        <div class="page" id="page-dashboard">
+          <div class="flex items-center justify-between mb-24">
+            <div>
+              <div class="page-title">대시보드</div>
+              <div class="page-subtitle">채용 프로세스 현황을 한눈에 확인하세요</div>
+            </div>
+            <button class="btn btn-primary" onclick="nav('sheets-new')">+ 설계시트 생성</button>
+          </div>
+
+          <div class="grid-4 mb-24">
+            <div class="stat-card">
+              <div class="stat-label">활성 포지션</div>
+              <div class="stat-value" id="stat-positions">0</div>
+              <div class="stat-change text-gray" id="stat-change-positions">등록된 포지션 없음</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">검토 중인 이력서</div>
+              <div class="stat-value" id="stat-resumes">0</div>
+              <div class="stat-change text-gray" id="stat-change-resumes">업로드된 이력서 없음</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">평균 매칭 점수</div>
+              <div class="stat-value" id="stat-score">—<span style="font-size:16px;color:#888">/5</span></div>
+              <div class="stat-change text-gray">분석 데이터 없음</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">완료된 면접 리포트</div>
+              <div class="stat-value" id="stat-reports">0</div>
+              <div class="stat-change text-gray" id="stat-change-reports">생성된 리포트 없음</div>
+            </div>
+          </div>
+
+          <div class="grid-2 gap-24">
+            <div class="card">
+              <div class="flex items-center justify-between mb-16">
+                <div class="section-title">최근 이력서 분석</div>
+                <a class="link" onclick="nav('matching')">전체 보기</a>
+              </div>
+              <div id="dash-recent">
+                <div class="empty-state">
+                  <div class="empty-icon">📋</div>
+                  <div class="empty-text">분석된 이력서가 없습니다</div>
+                </div>
+
+              </div>
+            </div>
+            <div class="card">
+              <div class="flex items-center justify-between mb-12">
+                <div class="section-title">포지션별 진행 현황</div>
+                <a class="link" onclick="nav('positions')">전체 보기</a>
+              </div>
+              <div class="flex gap-8 mb-12">
+                <select id="dash-pos-filter" class="form-control" style="width:110px;font-size:12px;padding:5px 8px"
+                  onchange="renderDashboard()">
+                  <option value="">전체 상태</option>
+                  <option value="채용중">채용중</option>
+                  <option value="채용완료">채용완료</option>
+                  <option value="준비중">준비중</option>
+                </select>
+              </div>
+              <div id="dash-positions">
+                <div class="empty-state">
+                  <div class="empty-icon">💼</div>
+                  <div class="empty-text">등록된 포지션이 없습니다</div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-2 gap-24 mt-16">
+            <div class="card">
+              <div class="section-title mb-12">진행 단계별 현황</div>
+              <div id="dash-stage-summary"></div>
+            </div>
+            <div class="card">
+              <div class="section-title mb-12">월별 최종합격 현황</div>
+              <div id="dash-monthly-hires"></div>
+            </div>
+          </div>
+
+          <div class="grid-2 gap-24 mt-16">
+            <div class="card">
+              <div class="section-title mb-12">Recruitment Funnel</div>
+              <div id="dash-funnel"></div>
+            </div>
+            <div class="card">
+              <div class="section-title mb-12">소싱채널별 채용인원</div>
+              <div id="dash-channel-hires"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Positions ── -->
+        <div class="page" id="page-positions">
+          <div class="flex items-center justify-between mb-16">
+            <div>
+              <div class="page-title">포지션 목록</div>
+              <div class="page-subtitle">채용 진행 중인 포지션을 관리합니다</div>
+            </div>
+            <button class="btn btn-primary" onclick="nav('sheets-new')">+ 설계시트 생성</button>
+          </div>
+          <div class="filter-bar">
+            <select id="pos-filter-status" class="form-control" style="width:130px" onchange="renderPositions()">
+              <option value="">전체 상태</option>
+              <option value="채용중">채용중</option>
+              <option value="채용완료">채용완료</option>
+              <option value="준비중">준비중</option>
+            </select>
+            <select id="pos-filter-team" class="form-control" style="width:140px" onchange="renderPositions()">
+              <option value="">전체 팀</option>
+            </select>
+            <select id="pos-filter-year" class="form-control" style="width:110px" onchange="renderPositions()">
+              <option value="">전체 연도</option>
+            </select>
+            <select id="pos-filter-month" class="form-control" style="width:100px" onchange="renderPositions()">
+              <option value="">전체 월</option>
+              <option value="01">1월</option>
+              <option value="02">2월</option>
+              <option value="03">3월</option>
+              <option value="04">4월</option>
+              <option value="05">5월</option>
+              <option value="06">6월</option>
+              <option value="07">7월</option>
+              <option value="08">8월</option>
+              <option value="09">9월</option>
+              <option value="10">10월</option>
+              <option value="11">11월</option>
+              <option value="12">12월</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="resetPosFilters()">필터 초기화</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>포지션명</th>
+                  <th>팀</th>
+                  <th>직무 레벨</th>
+                  <th>지원자</th>
+                  <th>상태</th>
+                  <th>생성일</th>
+                  <th>채용완료일</th>
+                  <th>보관장소</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="positions-tbody">
+                <tr id="positions-empty">
+                  <td colspan="8">
+                    <div class="empty-state">
+                      <div class="empty-icon">💼</div>
+                      <div class="empty-text">등록된 포지션이 없습니다. 설계시트를 생성하면 자동으로 포지션이 등록됩니다.</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── Design Sheets List ── -->
+        <div class="page" id="page-sheets">
+          <div class="flex items-center justify-between mb-24">
+            <div>
+              <div class="page-title">채용 역할 설계 시트</div>
+              <div class="page-subtitle">포지션별 역량 정의 시트를 관리합니다</div>
+            </div>
+            <button class="btn btn-primary" onclick="nav('sheets-new')">+ 설계시트 생성</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>포지션명</th>
+                  <th>팀</th>
+                  <th>생성일</th>
+                  <th>최종 수정일</th>
+                  <th>버전</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="sheets-tbody">
+                <tr id="sheets-empty">
+                  <td colspan="6">
+                    <div class="empty-state">
+                      <div class="empty-icon">📄</div>
+                      <div class="empty-text">생성된 설계 시트가 없습니다. 설계시트를 생성해보세요.</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── Sheet New ── -->
+        <div class="page" id="page-sheets-new">
+          <div class="flex items-center gap-12 mb-24">
+            <button class="btn btn-secondary btn-sm" onclick="nav('sheets')">← 목록</button>
+            <div>
+              <div class="page-title">설계 시트 생성</div>
+            </div>
+          </div>
+
+          <div class="card mb-16">
+            <div class="section-title mb-16">기본 정보</div>
+            <div class="form-row mb-12">
+              <div class="form-group">
+                <label class="form-label">포지션명 <span class="required">*</span></label>
+                <input id="new-position" class="form-control" placeholder="예: 시니어 백엔드 엔지니어" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">팀 <span class="required">*</span></label>
+                <input id="new-team" class="form-control" placeholder="예: 개발팀" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">보고 대상</label>
+                <input id="new-report-to" class="form-control" placeholder="예: CTO" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">채용 인원</label>
+                <input id="new-headcount" class="form-control" type="number" placeholder="1" />
+              </div>
+            </div>
+          </div>
+
+          <div class="card mb-16">
+            <div class="flex items-center justify-between mb-16">
+              <div class="section-title">직무 레벨 설정</div>
+              <button class="btn btn-secondary btn-sm" onclick="addLevelRow('new')">+ 레벨 추가</button>
+            </div>
+            <div style="font-size:12px;color:#888;margin-bottom:12px">이 포지션에서 채용하는 직무 레벨을 정의하세요 (예: L1 신입, L2 주니어, L3
+              시니어)</div>
+            <table class="level-table">
+              <thead>
+                <tr>
+                  <th style="width:80px">레벨코드</th>
+                  <th style="width:110px">레벨명</th>
+                  <th style="width:80px">최소경력</th>
+                  <th style="width:80px">최대경력</th>
+                  <th>비고</th>
+                  <th style="width:36px"></th>
+                </tr>
+              </thead>
+              <tbody id="new-levels-body">
+                <tr id="new-levels-empty">
+                  <td colspan="6" style="text-align:center;color:#bbb;font-size:12px;padding:16px">레벨을 추가하세요</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card mb-16">
+            <div class="flex items-center justify-between mb-16">
+              <div class="section-title">내용 입력 방식</div>
+            </div>
+            <div class="tabs">
+              <div class="tab active" id="tab-direct" onclick="switchTab('direct')">직접 입력</div>
+              <div class="tab" id="tab-upload" onclick="switchTab('upload')">워드 파일 업로드</div>
+            </div>
+
+            <div id="tab-content-direct">
+              <div
+                style="background:#f0f7ff;border:1px solid #b0d0f0;border-radius:6px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+                <div>
+                  <div style="font-size:13px;font-weight:600;color:#1a4a80;margin-bottom:2px">🤖 AI 자동 생성</div>
+                  <div class="text-sm text-gray">포지션명(상단)과 ① 역량 레벨을 먼저 입력하면 나머지 항목을 AI가 자동 작성합니다.</div>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="aiGenerateSheetFields()" id="btn-ai-gen-sheet"
+                  style="white-space:nowrap;flex-shrink:0">🤖 자동 생성</button>
+              </div>
+              <div class="form-group mb-16">
+                <label class="form-label">① 역량 레벨 <span class="required">*</span></label>
+                <textarea id="new-f1" class="form-control" rows="3"
+                  placeholder="요구되는 경력 수준, 역량 등급, 리더십 레벨 등을 기술하세요"></textarea>
+              </div>
+              <div class="form-group mb-16">
+                <label class="form-label">② 역할 범위 <span class="required">*</span></label>
+                <textarea id="new-f2" class="form-control" rows="3" placeholder="담당할 주요 업무 범위와 책임 영역을 기술하세요"></textarea>
+              </div>
+              <div class="form-group mb-16">
+                <label class="form-label">③ 필수 지식 / 기술 <span class="required">*</span></label>
+                <textarea id="new-f3" class="form-control" rows="3"
+                  placeholder="반드시 보유해야 하는 기술 스택, 지식, 자격 등을 기술하세요"></textarea>
+              </div>
+              <div class="form-group mb-16">
+                <label class="form-label">④ 폐기 / 자동화 업무</label>
+                <textarea id="new-f4" class="form-control" rows="2"
+                  placeholder="더 이상 수행하지 않거나 자동화된 기존 업무를 기술하세요"></textarea>
+              </div>
+              <div class="form-group mb-16">
+                <label class="form-label">⑤ 효율 증대 업무 (조직 내 업무 조정)</label>
+                <textarea id="new-f5" class="form-control" rows="2"
+                  placeholder="조직 내 협업 효율을 높이기 위해 조정된 업무를 기술하세요"></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">⑥ 결정적 무기 <span class="required">*</span></label>
+                <textarea id="new-f6" class="form-control" rows="3"
+                  placeholder="이 포지션에서 다른 후보자와 차별화되는 핵심 역량, 경험, 마인드셋을 기술하세요"></textarea>
+                <span class="form-hint">※ 결정적 무기는 매칭 분석 시 가장 높은 가중치가 부여됩니다.</span>
+              </div>
+            </div>
+
+            <div id="tab-content-upload" style="display:none">
+              <div class="upload-zone mb-16" onclick="document.getElementById('docx-file').click()"
+                ondragover="this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')">
+                <div class="upload-icon">🚨</div>
+                <div class="upload-text">워드 파일(.docx)을 드래그하거나 클릭하여 업로드</div>
+                <div class="upload-hint">최대 10MB · .docx 형식만 지원</div>
+              </div>
+              <input type="file" id="docx-file" accept=".docx" style="display:none" onchange="handleDocxUpload(this)" />
+              <div class="form-hint">업로드된 파일에서 6가지 항목을 자동으로 인식하여 파싱합니다. 파싱 후 내용을 검토하고 저장하세요.</div>
+            </div>
+          </div>
+
+          <div class="flex justify-between" style="gap:8px">
+            <button class="btn btn-secondary" onclick="nav('sheets')">취소</button>
+            <button class="btn btn-primary" onclick="saveSheet()">설계시트 저장</button>
+          </div>
+        </div>
+
+        <!-- ── Sheet Detail (동적 렌더링) ── -->
+        <div class="page" id="page-sheet-detail">
+          <div class="flex items-center gap-12 mb-8">
+            <button class="btn btn-secondary btn-sm" onclick="nav('sheets')">← 목록</button>
+          </div>
+          <div class="flex items-center justify-between mb-24">
+            <div>
+              <div class="page-title" id="detail-title"></div>
+              <div class="page-subtitle" id="detail-subtitle"></div>
+            </div>
+            <div class="flex gap-8">
+              <button class="btn btn-secondary btn-sm" onclick="nav('sheet-history')">변경 이력</button>
+              <button class="btn btn-secondary btn-sm" id="sheet-edit-toggle" onclick="toggleSheetEdit()">수정</button>
+              <button class="btn btn-danger btn-sm" onclick="confirmDeleteSheet()">삭제</button>
+            </div>
+          </div>
+
+          <div id="sheet-view-mode">
+            <div class="grid-2 gap-16" id="sheet-view-grid"></div>
+          </div>
+
+          <div id="sheet-edit-mode" style="display:none">
+            <div class="card mb-16">
+              <div class="form-group mb-16">
+                <label class="form-label">① 역량 레벨</label>
+                <textarea id="edit-f1" class="form-control" rows="3"></textarea>
+              </div>
+              <div class="form-group mb-16">
+                <label class="form-label">② 역할 범위</label>
+                <textarea id="edit-f2" class="form-control" rows="3"></textarea>
+              </div>
+              <div class="form-group mb-16">
+                <label class="form-label">③ 필수 지식 / 기술</label>
+                <textarea id="edit-f3" class="form-control" rows="2"></textarea>
+              </div>
+              <div class="form-group mb-16">
+                <label class="form-label">④ 폐기 / 자동화 업무</label>
+                <textarea id="edit-f4" class="form-control" rows="2"></textarea>
+              </div>
+              <div class="form-group mb-16">
+                <label class="form-label">⑤ 효율 증대 업무</label>
+                <textarea id="edit-f5" class="form-control" rows="2"></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">⑥ 결정적 무기</label>
+                <textarea id="edit-f6" class="form-control" rows="3"></textarea>
+              </div>
+            </div>
+            <div class="card mb-16" style="padding:16px">
+              <div class="flex items-center justify-between mb-12">
+                <div class="section-title" style="font-size:14px">직무 레벨 설정</div>
+                <button class="btn btn-secondary btn-sm" onclick="addLevelRow('edit')">+ 레벨 추가</button>
+              </div>
+              <table class="level-table">
+                <thead>
+                  <tr>
+                    <th style="width:80px">레벨코드</th>
+                    <th style="width:110px">레벨명</th>
+                    <th style="width:80px">최소경력</th>
+                    <th style="width:80px">최대경력</th>
+                    <th>비고</th>
+                    <th style="width:36px"></th>
+                  </tr>
+                </thead>
+                <tbody id="edit-levels-body">
+                  <tr id="edit-levels-empty">
+                    <td colspan="6" style="text-align:center;color:#bbb;font-size:12px;padding:16px">레벨을 추가하세요</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="flex gap-8">
+              <button class="btn btn-secondary" onclick="toggleSheetEdit()">취소</button>
+              <button class="btn btn-primary" onclick="saveSheetEdit()">저장</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Sheet History (동적 렌더링) ── -->
+        <div class="page" id="page-sheet-history">
+          <div class="flex items-center gap-12 mb-24">
+            <button class="btn btn-secondary btn-sm" onclick="nav('sheet-detail')">← 상세</button>
+            <div>
+              <div class="page-title">변경 이력</div>
+              <div class="page-subtitle" id="history-subtitle"></div>
+            </div>
+          </div>
+          <div class="card" id="history-list"></div>
+        </div>
+
+        <!-- ── Matching ── -->
+        <div class="page" id="page-matching">
+          <div class="flex items-center justify-between mb-24">
+            <div>
+              <div class="page-title">이력서 매칭 분석</div>
+              <div class="page-subtitle">이력서를 업로드하고 설계시트와의 매칭도를 분석합니다</div>
+            </div>
+            <button class="btn btn-primary" onclick="nav('matching-upload')">+ 이력서 업로드</button>
+          </div>
+
+          <div class="flex gap-12 mb-20" style="flex-wrap:wrap;align-items:center">
+            <select id="matching-filter-position" class="form-control" style="width:240px" onchange="filterMatching()">
+              <option value="">전체 포지션</option>
+            </select>
+            <select id="matching-filter-sort" class="form-control" style="width:160px" onchange="filterMatching()">
+              <option value="latest">최신순</option>
+              <option value="score-desc">점수 높은 순</option>
+              <option value="score-asc">점수 낮은 순</option>
+            </select>
+            <label
+              style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:8px 12px;background:#fff;border:1px solid #d0d0d0;border-radius:6px;white-space:nowrap">
+              <input type="checkbox" id="matching-exclude-completed" onchange="filterMatching()" />
+              채용완료 포지션 제외
+            </label>
+            <select id="matching-filter-rejected" class="form-control" style="width:180px" onchange="filterMatching()">
+              <option value="">전체 상태</option>
+              <option value="normal">검토중</option>
+              <option value="과제/공통면접">과제/공통면접 진행</option>
+              <option value="최종면접">최종면접 진행</option>
+              <option value="최종합격">최종합격</option>
+              <option value="rejected">불합격</option>
+            </select>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>지원자명</th>
+                  <th>포지션</th>
+                  <th style="min-width:160px">상태</th>
+                  <th>종합점수</th>
+                  <th>역량레벨</th>
+                  <th>필수기술</th>
+                  <th>결정적무기</th>
+                  <th>유입채널</th>
+                  <th>분석일</th>
+                  <th style="width:220px">작업</th>
+                </tr>
+              </thead>
+              <tbody id="matching-tbody">
+                <tr id="matching-empty">
+                  <td colspan="10">
+                    <div class="empty-state">
+                      <div class="empty-icon">🔍</div>
+                      <div class="empty-text">분석된 이력서가 없습니다. 이력서를 업로드해보세요.</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── Matching Upload ── -->
+        <div class="page" id="page-matching-upload">
+          <div class="flex items-center gap-12 mb-24">
+            <button class="btn btn-secondary btn-sm" onclick="nav('matching')">← 목록</button>
+            <div class="page-title">이력서 업로드 및 분석</div>
+          </div>
+
+          <div class="card mb-16">
+            <div class="section-title mb-16">포지션 선택</div>
+            <div class="form-row-3">
+              <div class="form-group">
+                <label class="form-label">대상 포지션 <span class="required">*</span></label>
+                <select id="upload-position-select" class="form-control">
+                  <option value="">포지션을 선택하세요</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">지원자명 <span class="required">*</span></label>
+                <input id="upload-applicant-name" class="form-control" placeholder="지원자 이름을 입력하세요" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">소싱 채널 <span class="required">*</span></label>
+                <select id="upload-channel-select" class="form-control">
+                  <option value="">소싱 채널을 선택하세요</option>
+                  <option value="온라인">온라인</option>
+                  <option value="헤드헌터">헤드헌터</option>
+                  <option value="추천채용">추천채용</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="card mb-16">
+            <div class="section-title mb-12">이력서 입력</div>
+            <div class="tabs" style="margin-bottom:16px">
+              <div class="tab active" id="rtab-file" onclick="switchResumeTab('file')">🚨 파일 업로드</div>
+              <div class="tab" id="rtab-paste" onclick="switchResumeTab('paste')">🚨 텍스트 붙여넣기</div>
+            </div>
+
+            <!-- 파일 업로드 탭 -->
+            <div id="resume-tab-file">
+              <label for="resume-file-input" id="resume-drop-zone" class="upload-zone mb-12"
+                style="display:flex;flex-direction:column;align-items:center;cursor:pointer"
+                ondragover="event.preventDefault();this.classList.add('dragover')"
+                ondragleave="this.classList.remove('dragover')" ondrop="handleResumeDrop(event)">
+                <div class="upload-icon">🚨</div>
+                <div class="upload-text">파일을 드래그하거나 클릭하여 선택</div>
+                <div class="upload-hint">PDF · DOCX · DOC · TXT · 최대 20MB</div>
+              </label>
+              <input type="file" id="resume-file-input" accept=".pdf,.docx,.doc,.txt"
+                style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px"
+                onchange="handleResumeFile(this)" />
+
+              <div id="resume-file-info"
+                style="display:none;background:#f8f8f8;border:1px solid #e0e0e0;border-radius:6px;padding:10px 14px">
+                <div class="flex items-center gap-8">
+                  <span>🚨</span>
+                  <span id="resume-file-name" class="font-bold"
+                    style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+                  <span id="resume-file-size" class="text-gray text-sm" style="flex-shrink:0"></span>
+                  <button class="btn btn-secondary btn-sm" onclick="clearResumeFile()">제거</button>
+                </div>
+                <div id="resume-extract-status" class="text-sm text-gray mt-8" style="display:none"></div>
+              </div>
+            </div>
+
+            <!-- 텍스트 붙여넣기 탭 -->
+            <div id="resume-tab-paste" style="display:none">
+              <div class="form-group">
+                <textarea id="resume-paste-text" class="form-control" rows="14" oninput="updatePasteCount()"
+                  placeholder="이력서 내용을 여기에 붙여넣으세요.&#10;&#10;이름, 연락처, 학력, 경력, 기술 스택, 자기소개 등 전체 내용을 복사해서 붙여넣으면&#10;자동으로 분석이 진행됩니다."></textarea>
+              </div>
+              <div class="flex items-center justify-between mt-8">
+                <span class="text-gray text-sm">텍스트 길이: <span id="paste-char-count">0</span>자</span>
+                <button class="btn btn-secondary btn-sm"
+                  onclick="document.getElementById('resume-paste-text').value='';updatePasteCount()">지우기</button>
+              </div>
+            </div>
+
+            <div class="form-hint mt-12">※ 업로드된 이력서는 암호화되어 안전하게 저장됩니다. 개인정보 수집 및 처리에 동의합니다.</div>
+          </div>
+
+          <div class="flex justify-between">
+            <button class="btn btn-secondary" onclick="nav('matching')">취소</button>
+            <button class="btn btn-primary" onclick="runAnalysis()">분석 시작</button>
+          </div>
+        </div>
+
+        <!-- ── Match Result (동적 렌더링) ── -->
+        <div class="page" id="page-match-result">
+          <div class="flex items-center gap-12 mb-8">
+            <button class="btn btn-secondary btn-sm" onclick="nav('matching')">← 목록</button>
+          </div>
+          <div class="flex items-center justify-between mb-24">
+            <div>
+              <div class="page-title" id="mr-title"></div>
+              <div class="page-subtitle" id="mr-subtitle"></div>
+            </div>
+            <div class="flex gap-8">
+              <button class="btn btn-secondary" onclick="openResumeEditModal()">✏️ 이력서 수정 · 재분석</button>
+              <button class="btn btn-secondary" onclick="printMatchResult()">🖨️ PDF 출력</button>
+              <button class="btn btn-primary" onclick="openReportDetail()">면접 질문 리포트 생성</button>
+            </div>
+          </div>
+          <!-- 인쇄용 래퍼 (화면엔 투명, 인쇄시만 활성) -->
+          <div id="pdf-print-area">
+            <div id="pdf-print-header">
+              <div class="pdf-title" id="pdf-title-text"></div>
+              <div class="pdf-meta" id="pdf-meta-text"></div>
+            </div>
+            <!-- 분석 결과가 여기에 동적으로 렌더링됩니다 -->
+            <div id="mr-body"></div>
+          </div>
+        </div>
+
+        <!-- 이력서 수정 모달 -->
+        <div class="modal-overlay" id="modal-resume-edit" onclick="closeModalOut(event,'modal-resume-edit')">
+          <div class="modal" style="width:680px;max-width:96vw">
+            <div class="modal-title">이력서 내용 수정 · 재분석</div>
+            <div class="text-sm text-gray mb-12">내용을 수정한 후 재분석을 실행하면 매칭 결과가 업데이트됩니다.</div>
+            <div class="form-group mb-8">
+              <div class="flex items-center justify-between mb-6">
+                <label class="form-label" style="margin:0">이력서 텍스트</label>
+                <span class="text-sm text-gray"><span id="edit-resume-char-count">0</span>자</span>
+              </div>
+              <textarea id="edit-resume-textarea" class="form-control" rows="16"
+                oninput="document.getElementById('edit-resume-char-count').textContent=this.value.length.toLocaleString()"
+                placeholder="이력서 내용을 입력하세요..."></textarea>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" onclick="closeModal('modal-resume-edit')">취소</button>
+              <button class="btn btn-primary" onclick="reAnalyzeResume()">🚨 재분석 실행</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Reports List ── -->
+        <div class="page" id="page-reports">
+          <div class="flex items-center justify-between mb-16">
+            <div>
+              <div class="page-title">면접 질문 리포트</div>
+              <div class="page-subtitle">구조화된 면접 질문 리포트를 생성하고 관리합니다</div>
+            </div>
+            <button class="btn btn-primary" onclick="nav('matching')">+ 이력서 분석에서 생성</button>
+          </div>
+
+          <!-- 뷰 모드 탭 + 필터 -->
+          <div class="card mb-16" style="padding:12px 16px">
+            <div class="flex items-center gap-8 flex-wrap">
+              <div style="display:flex;border:1px solid #e0e0e0;border-radius:6px;overflow:hidden">
+                <button id="rpt-tab-list" class="rpt-view-btn active" onclick="setRptView('list')">전체 목록</button>
+                <button id="rpt-tab-pos" class="rpt-view-btn" onclick="setRptView('pos')">포지션별</button>
+                <button id="rpt-tab-period" class="rpt-view-btn" onclick="setRptView('period')">연도/월별</button>
+              </div>
+              <div style="width:1px;height:22px;background:#e0e0e0;margin:0 2px"></div>
+              <select id="rpt-filter-pos" class="form-control" style="width:160px" onchange="renderReports()">
+                <option value="">전체 포지션</option>
+              </select>
+              <select id="rpt-filter-year" class="form-control" style="width:100px" onchange="renderReports()">
+                <option value="">전체 연도</option>
+              </select>
+              <select id="rpt-filter-month" class="form-control" style="width:80px" onchange="renderReports()" disabled>
+                <option value="">전체 월</option>
+              </select>
+              <button class="btn btn-secondary btn-sm" onclick="resetRptFilters()">초기화</button>
+              <button id="rpt-exclude-btn" class="btn btn-secondary btn-sm" onclick="toggleRptExclude()">불합격/채용완료 제외</button>
+              <span id="rpt-count-badge" class="text-sm text-gray" style="margin-left:auto"></span>
+            </div>
+          </div>
+
+          <!-- 전체 목록 뷰 -->
+          <div id="rpt-view-list">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>지원자명</th>
+                    <th>포지션</th>
+                    <th>매칭점수</th>
+                    <th>질문 수</th>
+                    <th>생성일</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="reports-tbody">
+                  <tr id="reports-empty">
+                    <td colspan="6">
+                      <div class="empty-state">
+                        <div class="empty-icon">📝</div>
+                        <div class="empty-text">생성된 면접 리포트가 없습니다. 매칭 분석 후 리포트를 생성하세요.</div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 그룹 뷰 (포지션별 / 연도·월별) -->
+          <div id="rpt-view-grouped" style="display:none"></div>
+        </div>
+
+        <!-- ── Report Detail (동적 렌더링) ── -->
+        <div class="page" id="page-report-detail">
+          <div class="flex items-center gap-12 mb-8">
+            <button class="btn btn-secondary btn-sm" onclick="nav('reports')">← 목록</button>
+          </div>
+          <div class="flex items-center justify-between mb-20">
+            <div>
+              <div class="page-title" id="rd-title"></div>
+              <div class="page-subtitle" id="rd-subtitle"></div>
+            </div>
+            <div class="flex gap-8">
+              <button class="btn btn-secondary" onclick="regenReport()">🔄 리포트 재생성</button>
+              <button class="btn btn-primary" onclick="downloadPDF()">🖨️ PDF 출력</button>
+            </div>
+          </div>
+          <!-- 생성 중 표시 -->
+          <div id="rd-generating" style="display:none" class="card mb-16">
+            <div class="flex items-center gap-16">
+              <div style="font-size:24px;animation:spin 1s linear infinite">⏳</div>
+              <div>
+                <div class="font-bold mb-4" id="rd-gen-label">Claude AI가 면접 질문을 생성 중입니다...</div>
+                <div class="text-gray text-sm" id="rd-gen-sub">설계시트와 이력서를 분석하고 있습니다.</div>
+              </div>
+            </div>
+          </div>
+          <!-- 본문 -->
+          <div id="rd-body"></div>
+        </div>
+
+        <!-- ── Interview Schedule ── -->
+        <div class="page" id="page-schedule">
+          <div class="flex items-center justify-between mb-16">
+            <div>
+              <div class="page-title">면접 일정 수립</div>
+              <div class="page-subtitle">면접관 가용 일정을 관리하고 면접자 일정을 배정합니다</div>
+            </div>
+            <div class="flex gap-8" id="sch-cal-btns">
+              <button class="btn btn-secondary" onclick="openInterviewerPool()">면접관 풀 관리</button>
+              <button class="btn btn-secondary" onclick="syncFromSheets()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  style="vertical-align:-1px">
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+                </svg>
+                시트 동기화
+              </button>
+              <button class="btn btn-primary" onclick="openAddSchedule()">+ 면접관 일정 등록</button>
+            </div>
+          </div>
+
+          <div class="tabs mb-16">
+            <div class="tab active" id="schtab-cal" onclick="switchScheduleTab('cal')">가용 일정 달력</div>
+            <div class="tab" id="schtab-assign" onclick="switchScheduleTab('assign')">면접자 일정 배정</div>
+          </div>
+
+          <!-- ── 탭1: 달력 ── -->
+          <div id="schedule-tab-cal">
+            <!-- Filter Bar -->
+            <div class="card mb-16" style="padding:12px 16px;">
+              <div class="flex gap-8 flex-wrap items-center">
+                <select id="cal-year" class="form-control" style="width:96px" onchange="renderCalendar()"></select>
+                <select id="cal-month" class="form-control" style="width:80px" onchange="renderCalendar()"></select>
+                <div style="width:1px;height:22px;background:#e0e0e0;margin:0 2px"></div>
+                <select id="cal-iv-add-sel" class="form-control" style="width:148px" onchange="addCalIvFilter()">
+                  <option value="">면접관 추가</option>
+                </select>
+                <div id="cal-iv-filter-tags" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center"></div>
+                <button class="btn btn-secondary btn-sm" onclick="resetCalFilters()">초기화</button>
+              </div>
+            </div>
+            <div class="status-legend">
+              <span style="font-weight:600;color:#444;margin-right:2px">상태 범례</span>
+              <span class="s-item"><span class="s-dot allday"></span>종일 가능</span>
+              <span class="s-item"><span class="s-dot morning"></span>오전 가능</span>
+              <span class="s-item"><span class="s-dot afternoon"></span>오후 가능</span>
+              <span class="s-item"><span class="s-dot partial"></span>일정 시간 불가</span>
+              <span class="s-item"><span class="s-dot unavailable"></span>불가</span>
+            </div>
+            <div class="cal-header">
+              <button class="cal-nav-btn" onclick="calShiftMonth(-1)">‹</button>
+              <div id="cal-month-title" class="cal-month-label"></div>
+              <button class="cal-nav-btn" onclick="calShiftMonth(1)">›</button>
+            </div>
+            <div id="cal-grid-wrap"></div>
+          </div>
+
+          <!-- ── 탭2: 면접자 일정 배정 ── -->
+          <div id="schedule-tab-assign" style="display:none">
+            <div class="flex items-center justify-between mb-12 flex-wrap gap-8">
+              <div class="text-sm text-gray">과제/공통면접 또는 최종면접 진행 상태 지원자의 면접 일정을 배정합니다.</div>
+              <div class="flex gap-8 flex-wrap items-center">
+                <select id="assign-filter-year" class="form-control" style="width:90px" onchange="renderAssignList()">
+                  <option value="">전체 연도</option>
+                </select>
+                <select id="assign-filter-month" class="form-control" style="width:76px" onchange="renderAssignList()">
+                  <option value="">전체 월</option>
+                </select>
+                <button id="assign-rejected-btn" class="btn btn-secondary btn-sm" onclick="toggleAssignRejected()">불합격 포함</button>
+                <select id="assign-filter-status" class="form-control" style="width:180px" onchange="renderAssignList()">
+                  <option value="">전체 면접 단계</option>
+                  <option value="과제/공통면접">과제/공통면접 진행</option>
+                  <option value="최종면접">최종면접 진행</option>
+                </select>
+              </div>
+            </div>
+            <div id="assign-list-wrap">
+              <div class="empty-state">
+                <div class="empty-icon">📅</div>
+                <div class="empty-text">과제/공통면접 또는 최종면접 진행 중인 지원자가 없습니다.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Admin ── -->
+        <div class="page" id="page-admin">
+          <div class="flex items-center justify-between mb-24">
+            <div class="page-title">관리자 설정</div>
+          </div>
+          <div class="tabs">
+            <div class="tab active" id="atab-users" onclick="switchAdminTab('users')">사용자 관리</div>
+            <div class="tab" id="atab-ai" onclick="switchAdminTab('ai')">🤖 AI 설정</div>
+            <div class="tab" id="atab-gs" onclick="switchAdminTab('gs')">🔗 구글 시트 연동</div>
+            <div class="tab" id="atab-ivset" onclick="switchAdminTab('ivset')">📋 면접 설정</div>
+            <div class="tab" id="atab-security" onclick="switchAdminTab('security')">보안 설정</div>
+            <div class="tab" id="atab-audit" onclick="switchAdminTab('audit')">감사 로그</div>
+            <div class="tab" id="atab-data" onclick="switchAdminTab('data')">📦 데이터 관리</div>
+          </div>
+
+          <div id="admin-tab-users">
+            <div class="flex justify-between mb-16">
+              <div class="flex gap-8">
+                <select class="form-control" style="width:160px">
+                  <option>전체 역할</option>
+                  <option>HR 관리자</option>
+                  <option>채용 관리자</option>
+                  <option>시스템 관리자</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" onclick="openModal('modal-add-user')">+ 사용자 등록</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>이름</th>
+                    <th>이메일</th>
+                    <th>역할</th>
+                    <th>상태</th>
+                    <th>최근 로그인</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="users-tbody">
+                  <tr>
+                    <td><strong>우성 관리자</strong></td>
+                    <td class="text-gray">wshr@woosung.kr</td>
+                    <td><span class="badge badge-gray">시스템 관리자</span></td>
+                    <td><span class="badge badge-green">활성</span></td>
+                    <td class="text-gray text-sm" id="admin-last-login">—</td>
+                    <td class="flex gap-8">
+                      <span class="text-gray text-sm">최고 관리자</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- AI 설정 탭 -->
+          <div id="admin-tab-ai" style="display:none">
+            <div class="card mb-16">
+              <div class="section-title mb-4">Claude API 연동 (Anthropic)</div>
+              <div class="text-sm text-gray mb-16">API 키는 서버 환경변수로만 관리되며 브라우저에는 전달되지 않습니다. 키가 설정되어 있으면 이력서 분석과 면접 질문 생성에 AI를 활용합니다.</div>
+              <div class="form-group mb-16">
+                <label class="form-label">사용 모델</label>
+                <select id="ai-model-select" class="form-control" style="width:320px" onchange="saveAiModel()">
+                  <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (권장 · 기본)</option>
+                  <option value="claude-opus-4-8">Claude Opus 4.8 (고품질 · 심층 분석)</option>
+                  <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (경량 · 빠름)</option>
+                </select>
+              </div>
+              <div class="flex gap-8 items-center">
+                <button class="btn btn-secondary" onclick="testApiKey()">연결 테스트</button>
+                <span id="ai-key-status" class="text-sm"></span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="section-title mb-12">AI 분석 동작 방식</div>
+              <div class="flex flex-col gap-10" style="font-size:13px;color:#555;line-height:1.8">
+                <div><strong>API 키 설정됨</strong> — 이력서 텍스트와 설계시트를 Claude에 전달해 심층 분석 수행. 항목별 점수, 피드백, 면접 질문이 AI로 생성됩니다.
+                </div>
+                <div>⚪ <strong>API 키 미설정</strong> — 키워드 매칭 방식으로 분석합니다. (기본값)</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Google Sheets 연동 탭 -->
+          <div id="admin-tab-gs" style="display:none">
+            <div class="card mb-16">
+              <div class="section-title mb-4">Google Sheets 연동 설정</div>
+              <div class="text-sm text-gray mb-16">면접 일정 달력을 구글 시트와 양방향 동기화합니다. Google Cloud Console에서 OAuth 2.0 클라이언트
+                ID를 발급하세요.</div>
+              <div class="form-group mb-12">
+                <label class="form-label">OAuth 2.0 클라이언트 ID</label>
+                <input id="gs-client-id" class="form-control" type="text" placeholder="xxxxx.apps.googleusercontent.com"
+                  style="font-family:monospace" />
+                <span class="form-hint">Google Cloud Console → API 및 서비스 → 사용자 인증 정보에서 발급</span>
+              </div>
+              <div class="form-group mb-16">
+                <label class="form-label">스프레드시트 ID</label>
+                <input id="gs-sheet-id" class="form-control" type="text"
+                  placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" style="font-family:monospace" />
+                <span class="form-hint">구글 시트 URL의 /d/ 뒤 문자열 (예:
+                  https://docs.google.com/spreadsheets/d/<strong>ID</strong>/edit)</span>
+              </div>
+              <div class="flex gap-8 items-center">
+                <button class="btn btn-primary" onclick="saveGsheetsConfig()">설정 저장</button>
+                <button class="btn btn-secondary" onclick="initGoogleAuth()">Google 계정 연결</button>
+                <button class="btn btn-secondary" onclick="initSheetsHeader()">시트 헤더 초기화</button>
+                <span id="gs-status" class="text-sm"></span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="section-title mb-12">시트 데이터 스키마</div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>열</th>
+                      <th>필드명</th>
+                      <th>예시</th>
+                      <th>설명</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>A</td>
+                      <td>날짜</td>
+                      <td>2026-07-15</td>
+                      <td>YYYY-MM-DD 형식</td>
+                    </tr>
+                    <tr>
+                      <td>B</td>
+                      <td>면접관</td>
+                      <td>홍길동</td>
+                      <td>면접관 이름</td>
+                    </tr>
+                    <tr>
+                      <td>C</td>
+                      <td>채용 직무</td>
+                      <td>백엔드 개발자</td>
+                      <td>포지션 이름</td>
+                    </tr>
+                    <tr>
+                      <td>D</td>
+                      <td>가용 상태</td>
+                      <td>allday / morning / afternoon / partial / unavailable</td>
+                      <td>5가지 상태값</td>
+                    </tr>
+                    <tr>
+                      <td>E</td>
+                      <td>세부 제한 시간</td>
+                      <td>14:00-16:00</td>
+                      <td>partial 상태일 때 불가 시간대</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="text-sm text-gray mt-12" style="line-height:1.7">
+                <strong>동기화 방식:</strong> 시트에서 행을 추가/수정하면 [시트 동기화] 버튼으로 불러올 수 있습니다.
+                달력에서 일정을 저장하면 Google 계정이 연결된 경우 해당 행이 시트에 자동으로 기록됩니다.
+              </div>
+            </div>
+          </div>
+
+          <!-- 면접 설정 탭 -->
+          <div id="admin-tab-ivset" style="display:none">
+            <div class="card mb-16">
+              <div class="section-title mb-4">면접 유형별 시간 설정</div>
+              <div class="text-sm text-gray mb-16">면접 유형별 소요 시간과 대기 시간을 설정하면 면접자 일정 배정 시 가능한 시간대를 자동으로 계산합니다.</div>
+              <div
+                style="display:grid;grid-template-columns:1fr 130px 130px;gap:12px;font-size:12px;font-weight:700;color:#888;padding:0 0 8px;border-bottom:1px solid #e8e8e8;margin-bottom:4px">
+                <span>면접 유형</span><span>면접 소요 시간 (분)</span><span>면접 간 대기 시간 (분)</span>
+              </div>
+              <div id="ivset-rows"></div>
+              <div class="flex gap-8 mt-16">
+                <button class="btn btn-primary" onclick="saveInterviewSettings()">저장</button>
+                <button class="btn btn-secondary" onclick="resetInterviewSettings()">초기값으로 재설정</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="section-title mb-12">시간대 정의</div>
+              <div class="flex flex-col gap-8" style="font-size:13px;color:#555">
+                <div><strong>오전 가능</strong> — 09:00 ~ 12:00 사이에 면접 배정 가능</div>
+                <div><strong>오후 가능</strong> — 13:00 ~ 18:00 사이에 면접 배정 가능</div>
+                <div><strong>종일 가능</strong> — 09:00 ~ 18:00 사이에 면접 배정 가능</div>
+                <div><strong>일정 시간 불가</strong> — 종일 가능하되 등록된 불가 시간대는 배정에서 자동 제외</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="admin-tab-security" style="display:none">
+            <div class="card mb-16">
+              <div class="section-title mb-16">데이터 암호화</div>
+              <div class="flex flex-col gap-12">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <div class="font-bold mb-4">저장 데이터 암호화 (AES-256)</div>
+                    <div class="text-sm text-gray">DB 저장 데이터 및 파일 암호화</div>
+                  </div>
+                  <span class="badge badge-green">활성</span>
+                </div>
+                <hr class="divider" />
+                <div class="flex items-center justify-between">
+                  <div>
+                    <div class="font-bold mb-4">전송 암호화 (TLS 1.3)</div>
+                    <div class="text-sm text-gray">클라이언트-서버 통신 암호화</div>
+                  </div>
+                  <span class="badge badge-green">활성</span>
+                </div>
+                <hr class="divider" />
+                <div class="flex items-center justify-between">
+                  <div>
+                    <div class="font-bold mb-4">암호화 키 순환</div>
+                    <div class="text-sm text-gray">마지막 순환: 2026-06-01</div>
+                  </div>
+                  <button class="btn btn-secondary btn-sm" onclick="showToast('키 순환이 예약되었습니다.','info')">키 순환 예약</button>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="section-title mb-16">개인정보 보호</div>
+              <div class="flex flex-col gap-12">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <div class="font-bold mb-4">데이터 보유 기간</div>
+                    <div class="text-sm text-gray">이력서 데이터 보유 기간 설정</div>
+                  </div>
+                  <select class="form-control" style="width:140px">
+                    <option>12개월</option>
+                    <option>6개월</option>
+                    <option>24개월</option>
+                  </select>
+                </div>
+                <hr class="divider" />
+                <div class="flex items-center justify-between">
+                  <div>
+                    <div class="font-bold mb-4">PII 마스킹</div>
+                    <div class="text-sm text-gray">화면 표시 시 민감 정보 마스킹</div>
+                  </div>
+                  <select class="form-control" style="width:140px">
+                    <option>HR 관리자만 해제</option>
+                    <option>전체 해제</option>
+                  </select>
+                </div>
+                <hr class="divider" />
+                <div class="flex items-center justify-between">
+                  <div>
+                    <div class="font-bold mb-4">보안 점검 스케줄</div>
+                    <div class="text-sm text-gray">다음 점검: 2026-07-01</div>
+                  </div>
+                  <span class="badge badge-green">월 1회 설정됨</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="admin-tab-audit" style="display:none">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>일시</th>
+                    <th>사용자</th>
+                    <th>행위</th>
+                    <th>대상</th>
+                    <th>IP</th>
+                  </tr>
+                </thead>
+                <tbody id="audit-tbody">
+                  <tr id="audit-empty">
+                    <td colspan="5">
+                      <div class="empty-state">
+                        <div class="empty-icon">🔒</div>
+                        <div class="empty-text">기록된 감사 로그가 없습니다.</div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="admin-tab-data" style="display:none">
+            <div class="card mb-16">
+              <div class="section-title mb-4">📤 데이터 내보내기</div>
+              <div class="text-sm text-gray mb-16">설계시트, 매칭 분석 결과, API 설정 등 모든 데이터를 JSON 파일로 저장합니다.<br>다른 브라우저나 서버 환경으로
+                이동할 때 사용하세요.</div>
+              <div class="flex gap-8 items-center">
+                <button class="btn btn-primary" onclick="exportAllData()">📥 JSON 파일로 내보내기</button>
+                <span class="text-sm text-gray" id="export-status"></span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="section-title mb-4">📂 데이터 가져오기</div>
+              <div class="text-sm text-gray mb-16">이전에 내보낸 JSON 파일을 불러와 데이터를 복원합니다.<br><strong style="color:#cc3333">⚠️
+                  기존 데이터는 덮어씌워집니다.</strong></div>
+              <div class="upload-zone mb-12" style="padding:20px"
+                onclick="document.getElementById('import-file-input').click()">
+                <div class="upload-text">JSON 파일을 클릭하거나 드래그하여 가져오기</div>
+                <div class="upload-hint">내보내기로 생성된 .json 파일만 지원</div>
+              </div>
+              <input type="file" id="import-file-input" accept=".json" style="display:none"
+                onchange="importAllData(this)" />
+              <div id="import-status" class="text-sm" style="display:none"></div>
+            </div>
+            <div class="card mt-16">
+              <div class="flex items-center justify-between mb-4">
+                <div class="section-title">🕑 자동 백업 (최근 15개)</div>
+                <button class="btn btn-secondary btn-sm" onclick="manualBackupNow()">지금 백업하기</button>
+              </div>
+              <div class="text-sm text-gray mb-16">이 브라우저에 자동으로 저장된 백업 스냅샷입니다. 클라우드 동기화 전, 앱 시작 시,
+                데이터 저장 시 자동으로 기록됩니다. 문제가 생기면 여기서 이전 상태로 복원하거나 파일로 내려받으세요.</div>
+              <div id="backup-history-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Mini Quest (Phase 5) Interview ── -->
+        <div class="page" id="page-mini-quest">
+          <div id="qq-root"></div>
+        </div>
+
+        <!-- ── Mini Quest Results ── -->
+        <div class="page" id="page-qq-results">
+          <div class="flex items-center justify-between mb-24">
+            <div>
+              <div class="page-title">과제 면접 결과 목록</div>
+              <div class="page-subtitle">저장된 과제(미니 퀘스트) 면접 평가 결과를 조회합니다</div>
+            </div>
+            <div class="flex gap-8">
+              <select id="qqr-filter-verdict" class="form-control" style="width:130px" onchange="renderQQResults()">
+                <option value="">전체 결과</option>
+                <option value="합격">합격</option>
+                <option value="불합격">불합격</option>
+              </select>
+              <button class="btn btn-danger btn-sm" onclick="clearAllQQResults()">전체 삭제</button>
+            </div>
+          </div>
+          <div id="qqr-stats" class="grid-4 mb-24"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>지원자</th>
+                  <th>포지션</th>
+                  <th>판정</th>
+                  <th>Red Flag</th>
+                  <th>평가일시</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="qqr-tbody">
+                <tr>
+                  <td colspan="6">
+                    <div class="empty-state">
+                      <div class="empty-icon">📋</div>
+                      <div class="empty-text">저장된 과제 면접 결과가 없습니다</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── Mini Quest Result Detail ── -->
+        <div class="page" id="page-qq-result-detail">
+          <div class="flex items-center gap-12 mb-8">
+            <button class="btn btn-secondary btn-sm" onclick="nav('qq-results')">← 목록</button>
+          </div>
+          <div class="flex items-center justify-between mb-24">
+            <div>
+              <div class="page-title" id="qqrd-title"></div>
+              <div class="page-subtitle" id="qqrd-subtitle"></div>
+            </div>
+          </div>
+          <div id="qqrd-body"></div>
+        </div>
+
+        <!-- ── Core Interview ── -->
+        <div class="page" id="page-core-interview">
+          <div id="ci-root"></div>
+        </div>
+
+        <!-- ── CI Results ── -->
+        <div class="page" id="page-ci-results">
+          <div class="flex items-center justify-between mb-24">
+            <div>
+              <div class="page-title">코어 면접 결과 목록</div>
+              <div class="page-subtitle">저장된 코어 면접 평가 결과를 조회합니다</div>
+            </div>
+            <div class="flex gap-8">
+              <select id="cir-filter-status" class="form-control" style="width:110px" onchange="renderCIResults()">
+                <option value="">전체 상태</option>
+                <option value="draft">작성중</option>
+                <option value="done">완료</option>
+              </select>
+              <select id="cir-filter-verdict" class="form-control" style="width:130px" onchange="renderCIResults()">
+                <option value="">전체 결과</option>
+                <option value="합격">합격</option>
+                <option value="불합격">불합격</option>
+              </select>
+              <button class="btn btn-danger btn-sm" onclick="clearAllCIResults()">전체 삭제</button>
+            </div>
+          </div>
+          <div id="cir-stats" class="grid-4 mb-24"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>지원자</th>
+                  <th>포지션</th>
+                  <th>트랙</th>
+                  <th>상태</th>
+                  <th>판정</th>
+                  <th>Red Flag</th>
+                  <th>평가일시</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="cir-tbody">
+                <tr>
+                  <td colspan="8">
+                    <div class="empty-state">
+                      <div class="empty-icon">📋</div>
+                      <div class="empty-text">저장된 면접 결과가 없습니다</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── CI Result Detail ── -->
+        <div class="page" id="page-ci-result-detail">
+          <div class="flex items-center gap-12 mb-8">
+            <button class="btn btn-secondary btn-sm" onclick="nav('ci-results')">← 목록</button>
+          </div>
+          <div class="flex items-center justify-between mb-24">
+            <div>
+              <div class="page-title" id="cird-title"></div>
+              <div class="page-subtitle" id="cird-subtitle"></div>
+            </div>
+            <div class="flex gap-8">
+              <button class="btn btn-secondary" onclick="printSavedCIResult()">🖨️ PDF 출력</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteSavedCIResult()">삭제</button>
+            </div>
+          </div>
+          <div id="cird-body"></div>
+        </div>
+
+        <!-- ── Account ── -->
+        <div class="page" id="page-account">
+          <div class="flex items-center justify-between mb-24">
+            <div class="page-title">내 계정</div>
+          </div>
+          <div class="grid-2 gap-16">
+            <div class="card">
+              <div class="section-title mb-16">계정 정보</div>
+              <div class="form-group mb-12">
+                <label class="form-label">이름</label>
+                <input class="form-control" id="account-name" value="우성 관리자" />
+              </div>
+              <div class="form-group mb-12">
+                <label class="form-label">이메일 <span class="text-gray text-sm">(수정 불가)</span></label>
+                <input class="form-control" id="account-email" value="wshr@woosung.kr" disabled
+                  style="background:#f5f5f5;color:#999" />
+              </div>
+              <div class="form-group mb-12">
+                <label class="form-label">연락처</label>
+                <input class="form-control" id="account-phone" value="" placeholder="연락처를 입력하세요" />
+              </div>
+              <div class="form-group mb-20">
+                <label class="form-label">역할 <span class="text-gray text-sm">(수정 불가)</span></label>
+                <input class="form-control" value="시스템 관리자" disabled style="background:#f5f5f5;color:#999" />
+              </div>
+              <button class="btn btn-primary" onclick="showToast('계정 정보가 저장되었습니다.','success')">저장</button>
+            </div>
+
+            <div class="card">
+              <div class="section-title mb-16">비밀번호 변경</div>
+              <div class="form-group mb-12">
+                <label class="form-label">현재 비밀번호</label>
+                <input class="form-control" type="password" placeholder="현재 비밀번호를 입력하세요" />
+              </div>
+              <div class="form-group mb-12">
+                <label class="form-label">새 비밀번호</label>
+                <input class="form-control" type="password" id="new-pw" placeholder="새 비밀번호를 입력하세요"
+                  oninput="checkPwStrength(this.value)" />
+              </div>
+              <div id="pw-strength" class="mb-12" style="display:none">
+                <div class="flex gap-4 mb-4">
+                  <div id="ps1" class="score-bar-fill" style="flex:1;height:4px;border-radius:2px;background:#eee">
+                  </div>
+                  <div id="ps2" class="score-bar-fill" style="flex:1;height:4px;border-radius:2px;background:#eee">
+                  </div>
+                  <div id="ps3" class="score-bar-fill" style="flex:1;height:4px;border-radius:2px;background:#eee">
+                  </div>
+                </div>
+                <span id="pw-strength-label" class="text-sm text-gray"></span>
+              </div>
+              <div class="form-group mb-20">
+                <label class="form-label">새 비밀번호 확인</label>
+                <input class="form-control" type="password" id="new-pw-confirm" placeholder="새 비밀번호를 다시 입력하세요" />
+              </div>
+              <div class="form-hint mb-16">최소 8자 이상, 영문/숫자/특수문자 포함</div>
+              <button class="btn btn-primary" onclick="changePassword()">비밀번호 변경</button>
+              <div class="mt-16">
+                <button class="btn btn-secondary btn-full" onclick="doLogout()">로그아웃</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ═══ MODALS ═══ -->
+
+  <div class="modal-overlay" id="modal-add-user" onclick="closeModalOut(event,'modal-add-user')">
+    <div class="modal">
+      <div class="modal-title">사용자 등록</div>
+      <div class="form-row mb-12">
+        <div class="form-group">
+          <label class="form-label">이름 <span class="required">*</span></label>
+          <input class="form-control" placeholder="이름을 입력하세요" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">이메일 <span class="required">*</span></label>
+          <input class="form-control" type="email" placeholder="이메일을 입력하세요" />
+        </div>
+      </div>
+      <div class="form-group mb-12">
+        <label class="form-label">역할 <span class="required">*</span></label>
+        <select class="form-control">
+          <option>HR 관리자</option>
+          <option>채용 관리자 (현업 팀장)</option>
+          <option>시스템 관리자</option>
+        </select>
+      </div>
+      <div class="form-hint mb-16">등록된 이메일로 임시 비밀번호가 발송됩니다.</div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-add-user')">취소</button>
+        <button class="btn btn-primary" onclick="addUser()">등록</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-user-perms" onclick="closeModalOut(event,'modal-user-perms')">
+    <div class="modal modal-lg">
+      <div class="modal-title" id="perm-modal-title">권한 설정</div>
+      <div class="flex flex-col gap-10">
+        <div class="flex items-center justify-between">
+          <span>설계시트 생성/수정</span>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-perm="sheet_edit" /> 허용</label>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>설계시트 삭제</span>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-perm="sheet_delete" /> 허용</label>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>이력서 업로드/분석</span>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-perm="resume_analyze" /> 허용</label>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>매칭 결과 조회</span>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-perm="match_view" /> 허용</label>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>면접 리포트 생성/조회</span>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-perm="report_view" /> 허용</label>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>사용자 관리</span>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-perm="user_manage" /> 허용</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-user-perms')">취소</button>
+        <button class="btn btn-primary" onclick="savePerms()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-confirm" onclick="closeModalOut(event,'modal-confirm')">
+    <div class="modal">
+      <div class="modal-title" id="confirm-title">확인</div>
+      <p id="confirm-msg" style="font-size:14px;color:#555;line-height:1.6"></p>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-confirm')">취소</button>
+        <button class="btn btn-danger" id="confirm-ok-btn">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-assignments" onclick="closeModalOut(event,'modal-assignments')">
+    <div class="modal modal-lg">
+      <div class="modal-title" id="assignment-modal-title">과제 관리</div>
+
+      <div id="assignment-list" class="mb-16"></div>
+
+      <button class="btn btn-secondary btn-sm mb-12" onclick="openAssignmentForm(null)">+ 새 과제 등록</button>
+
+      <div id="assignment-form" style="display:none;border-top:1px solid #eee;padding-top:12px">
+        <div class="form-group mb-12">
+          <label class="form-label">과제 제목 <span class="required">*</span></label>
+          <input id="assignment-title" class="form-control" placeholder="예: 1차 코딩 과제" />
+        </div>
+        <div class="form-group mb-12">
+          <label class="form-label">과제 내용</label>
+          <textarea id="assignment-content" class="form-control" rows="6" placeholder="과제 설명/문제 내용을 입력하세요"></textarea>
+        </div>
+        <div class="form-group mb-12">
+          <label class="form-label">첨부파일 (선택)</label>
+          <input id="assignment-file-input" type="file" class="form-control" onchange="handleAssignmentFileUpload(this)" />
+          <div id="assignment-file-info" class="form-hint"></div>
+        </div>
+        <div class="flex gap-8" style="justify-content:flex-end">
+          <button class="btn btn-secondary" onclick="closeAssignmentForm()">취소</button>
+          <button class="btn btn-primary" onclick="saveAssignment()">저장</button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-assignments')">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Schedule Edit Modal ── -->
+  <div class="modal-overlay" id="modal-schedule" onclick="closeModalOut(event,'modal-schedule')">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-title" id="sch-modal-title">일정 등록</div>
+      <input type="hidden" id="sch-edit-idx" value="-1" />
+      <div class="form-group mb-12">
+        <label class="form-label">날짜 <span style="color:#cc3333">*</span></label>
+        <input type="date" id="sch-date" class="form-control" />
+      </div>
+      <div class="form-group mb-12">
+        <label class="form-label">면접관 <span style="color:#cc3333">*</span></label>
+        <div style="display:flex;gap:8px">
+          <select id="sch-interviewer" class="form-control" style="flex:1">
+            <option value="">-- 면접관 선택 --</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="openInterviewerPool()" style="white-space:nowrap">풀
+            관리</button>
+        </div>
+      </div>
+      <div class="form-group mb-12">
+        <label class="form-label">가용 상태 <span style="color:#cc3333">*</span></label>
+        <select id="sch-status" class="form-control" onchange="toggleBlockTime()">
+          <option value="allday">종일 가능 (09:00 ~ 18:00 상시)</option>
+          <option value="morning">오전 가능 (09:00 ~ 12:00)</option>
+          <option value="afternoon">오후 가능 (13:00 ~ 18:00)</option>
+          <option value="partial">일정 시간 불가 (특정 시간대만 불가)</option>
+          <option value="unavailable">불가 (해당 일자 전체 면접 불가)</option>
+        </select>
+      </div>
+      <div class="form-group mb-16" id="sch-blocktime-wrap" style="display:none">
+        <label class="form-label">불가 시간대</label>
+        <input type="text" id="sch-blocktime" class="form-control" placeholder="예: 14:00-16:00" />
+        <span class="form-hint">해당 시간대를 제외한 나머지 시간은 면접 가능합니다</span>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-schedule')">취소</button>
+        <button class="btn btn-danger" id="sch-delete-btn" style="display:none"
+          onclick="deleteScheduleEntry()">삭제</button>
+        <button class="btn btn-primary" onclick="saveScheduleEntry()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Appointment Edit Modal ── -->
+  <div class="modal-overlay" id="modal-edit-appt" onclick="closeModalOut(event,'modal-edit-appt')">
+    <div class="modal" style="max-width:500px">
+      <div class="modal-title">면접 일정 수정</div>
+      <input type="hidden" id="edit-appt-idx" />
+      <div class="form-group mb-12">
+        <label class="form-label">지원자</label>
+        <div id="edit-appt-candidate" style="font-weight:600;font-size:14px;padding:6px 0"></div>
+      </div>
+      <div class="form-group mb-12">
+        <label class="form-label">면접 유형 <span style="color:#cc3333">*</span></label>
+        <select id="edit-appt-type" class="form-control"></select>
+      </div>
+      <div class="form-group mb-12">
+        <label class="form-label">면접관 <span style="color:#cc3333">*</span></label>
+        <div id="edit-appt-iv-list" class="iv-check-list"></div>
+      </div>
+      <div class="form-group mb-12">
+        <label class="form-label">날짜 <span style="color:#cc3333">*</span></label>
+        <input type="date" id="edit-appt-date" class="form-control" />
+      </div>
+      <div class="form-group mb-16">
+        <label class="form-label">시간 <span style="color:#cc3333">*</span></label>
+        <input type="text" id="edit-appt-time" class="form-control" placeholder="예: 10:00" />
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-edit-appt')">취소</button>
+        <button class="btn btn-danger" onclick="deleteAppt()">삭제</button>
+        <button class="btn btn-primary" onclick="saveEditAppt()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Interviewer Pool Modal ── -->
+  <div class="modal-overlay" id="modal-interviewer" onclick="closeModalOut(event,'modal-interviewer')">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-title">면접관 풀 관리</div>
+      <div class="text-sm text-gray mb-12">면접관을 등록하면 일정 필터와 등록 폼에서 선택할 수 있습니다.</div>
+      <div id="iv-pool-list" style="max-height:280px;overflow-y:auto;margin-bottom:16px;min-height:48px"></div>
+      <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:8px;margin-bottom:4px">
+        <input type="text" id="iv-new-name" class="form-control" placeholder="이름" />
+        <input type="text" id="iv-new-positions" class="form-control" placeholder="담당 직무 (쉼표로 구분)" />
+        <button class="btn btn-primary" onclick="addInterviewer()">추가</button>
+      </div>
+      <span class="form-hint mb-16" style="display:block">예: 백엔드 개발자, UI/UX 디자이너</span>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-interviewer')">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Interview Assign Modal ── -->
+  <div class="modal-overlay" id="modal-assign" onclick="closeModalOut(event,'modal-assign')">
+    <div class="modal" style="max-width:540px">
+      <div class="modal-title" id="assign-modal-title">면접 일정 배정</div>
+      <input type="hidden" id="assign-candidate-idx" value="-1" />
+      <div class="text-sm text-gray mb-16" id="assign-candidate-info"></div>
+
+      <div class="form-group mb-12">
+        <label class="form-label">면접 유형 <span style="color:#cc3333">*</span></label>
+        <select id="assign-type" class="form-control" onchange="loadAvailableDates()">
+          <option value="">-- 면접 유형 선택 --</option>
+          <option value="과제면접">과제 면접</option>
+          <option value="공통면접">공통 면접</option>
+          <option value="최종면접">최종 면접</option>
+        </select>
+      </div>
+      <div class="form-group mb-12">
+        <label class="form-label">면접관 <span style="color:#cc3333">*</span> <span class="text-gray text-sm">(복수 선택
+            가능)</span></label>
+        <div id="assign-interviewer-list" class="iv-check-list">
+          <span class="text-gray text-sm">면접관 풀을 먼저 등록하세요.</span>
+        </div>
+      </div>
+
+      <div id="assign-date-section" style="display:none">
+        <div class="form-label mb-8">가능한 날짜 <span class="text-gray text-sm">(오늘 이후 가용 날짜만 표시)</span></div>
+        <div class="avail-date-row" id="assign-date-list"></div>
+      </div>
+
+      <div id="assign-time-section" style="display:none">
+        <div class="form-label mb-8">가능한 시간대 <span class="text-gray text-sm" id="assign-time-hint"></span></div>
+        <div class="slot-grid" id="assign-slot-list"></div>
+      </div>
+
+      <div id="assign-selected-info"
+        style="display:none;padding:10px 14px;background:#f0faf4;border:1px solid #b0e0c0;border-radius:6px;margin-top:12px;font-size:13px">
+        <strong>배정 예정:</strong> <span id="assign-summary"></span>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-assign')">취소</button>
+        <button class="btn btn-primary" id="assign-confirm-btn" style="display:none" onclick="confirmAssign()">일정
+          확정</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div class="toast-wrap" id="toast-wrap"></div>
+
+
+  <script src="db.js"></script>
+  <script src="app.js"></script>
+</body>
+
+</html>
