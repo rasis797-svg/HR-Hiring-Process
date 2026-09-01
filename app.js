@@ -1293,7 +1293,7 @@
       const sort = document.getElementById('matching-filter-sort').value;
       const exclDone = document.getElementById('matching-exclude-completed')?.checked;
       const rejFilter = document.getElementById('matching-filter-rejected')?.value || '';
-      let rows = matchingData.slice();
+      let rows = matchingData.filter(canViewCandidate);
       if (pos) rows = rows.filter(m => m.position === pos);
       if (exclDone) {
         const completedPos = sheetsData.filter(s => s.status === '채용완료').map(s => s.name);
@@ -1539,9 +1539,10 @@ interview_questions.role_based는 6~10개, career_issues는 경력 이슈가 없
     // ══════════════════════════════════════════════════
 
     async function openMatchResult(idx) {
-      currentMatchIdx = idx;
       const m = matchingData[idx];
       if (!m) return;
+      if (!canViewCandidate(m)) { showToast('열람 권한이 없는 지원자입니다. 담당 팀·보고 대상 범위를 확인하세요.', 'error'); return; }
+      currentMatchIdx = idx;
 
       document.getElementById('mr-title').textContent = `매칭 결과 — ${m.applicant}`;
       document.getElementById('mr-subtitle').textContent = `${m.position} · 분석일: ${m.date} · 입력방식: ${m.source || '파일'}`;
@@ -1713,6 +1714,8 @@ interview_questions.role_based는 6~10개, career_issues는 경력 이슈가 없
     async function openReportDetail() {
       if (currentMatchIdx < 0) { showToast('먼저 매칭 분석을 실행하세요.', 'error'); return; }
       const m = matchingData[currentMatchIdx];
+      if (!m) return;
+      if (!canViewCandidate(m)) { showToast('열람 권한이 없는 지원자입니다. 담당 팀·보고 대상 범위를 확인하세요.', 'error'); return; }
       const sheet = sheetsData.find(s => s.name === m.position);
 
       document.getElementById('rd-title').textContent = `면접 질문 리포트 — ${m.applicant}`;
@@ -2000,11 +2003,12 @@ ${m.extractedText.substring(0, 3000)}
     }
 
     function renderDashboard() {
+      const visibleMatching = matchingData.filter(canViewCandidate);
       const posCount = sheetsData.length;
-      const resCount = matchingData.length;
-      const scored = matchingData.filter(m => parseFloat(m.score) > 0);
+      const resCount = visibleMatching.length;
+      const scored = visibleMatching.filter(m => parseFloat(m.score) > 0);
       const avgScore = scored.length ? scored.reduce((s, m) => s + parseFloat(m.score), 0) / scored.length : null;
-      const reportCount = matchingData.filter(m => m.reportData?.interview_questions).length;
+      const reportCount = visibleMatching.filter(m => m.reportData?.interview_questions).length;
       const el = id => document.getElementById(id);
 
       // stat 수치
@@ -2028,10 +2032,10 @@ ${m.extractedText.substring(0, 3000)}
       // 최근 이력서 분석 (최신 5건)
       const recentEl = el('dash-recent');
       if (recentEl) {
-        if (matchingData.length === 0) {
+        if (visibleMatching.length === 0) {
           recentEl.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">분석된 이력서가 없습니다</div></div>';
         } else {
-          const recent = matchingData.slice().reverse().slice(0, 5);
+          const recent = visibleMatching.slice().reverse().slice(0, 5);
           recentEl.innerHTML = recent.map((m, i) => {
             const idx = matchingData.indexOf(m);
             const scoreNum = parseFloat(m.score);
@@ -2069,7 +2073,7 @@ ${m.extractedText.substring(0, 3000)}
           posEl.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">해당 상태의 포지션이 없습니다</div></div>';
         } else {
           posEl.innerHTML = posRows.map((s, i) => {
-            const applicants = matchingData.filter(m => m.position === s.name);
+            const applicants = visibleMatching.filter(m => m.position === s.name);
             const withScore = applicants.filter(m => parseFloat(m.score) > 0);
             const avg = withScore.length ? withScore.reduce((sum, m) => sum + parseFloat(m.score), 0) / withScore.length : null;
             const hasReport = applicants.filter(m => m.reportData?.interview_questions).length;
@@ -2238,7 +2242,7 @@ ${m.extractedText.substring(0, 3000)}
     }
 
     function renderReports() {
-      const allRows = matchingData.filter(m => m.reportData?.interview_questions);
+      const allRows = matchingData.filter(m => m.reportData?.interview_questions).filter(canViewCandidate);
 
       // 포지션 필터 옵션 동기화
       const posSel = document.getElementById('rpt-filter-pos');
@@ -2449,6 +2453,7 @@ ${m.extractedText.substring(0, 3000)}
     async function regenReportFor(idx) {
       const m = matchingData[idx];
       if (!m) return;
+      if (!canViewCandidate(m)) { showToast('열람 권한이 없는 지원자입니다. 담당 팀·보고 대상 범위를 확인하세요.', 'error'); return; }
       m.reportData = null;
       currentMatchIdx = idx;
       showToast('리포트를 재생성합니다...', 'info');
@@ -3372,8 +3377,67 @@ ${m.extractedText.substring(0, 3000)}
       }
     }
 
-    const DEFAULT_PERMS = { sheet_edit: true, sheet_delete: false, resume_analyze: true, match_view: true, report_view: true, user_manage: false };
+    const DEFAULT_PERMS = {
+      sheet_edit: true, sheet_delete: false, resume_analyze: true, match_view: true, report_view: true, user_manage: false,
+      // 채용 관리자(현업 팀장)에게만 적용되는 지원자 열람 범위. mode:'all'이면 기존과 동일하게 전체 열람.
+      candidateScope: { mode: 'all', pairs: [] }
+    };
     let currentPermUserId = null;
+
+    // 설계시트(포지션)에 등록된 팀·보고 대상의 고유 조합 목록 — 권한 모달 체크리스트, 열람 범위 판정에 공통으로 쓴다.
+    function distinctTeamReportPairs() {
+      const seen = new Map();
+      sheetsData.forEach(s => {
+        const team = (s.team || '').trim();
+        if (!team) return;
+        const reportTo = (s.reportTo || '').trim();
+        const key = team + '‖' + reportTo;
+        if (!seen.has(key)) seen.set(key, { team, reportTo });
+      });
+      return [...seen.values()].sort((a, b) =>
+        a.team.localeCompare(b.team, 'ko') || a.reportTo.localeCompare(b.reportTo, 'ko'));
+    }
+
+    // 지원자 m이 scope(팀·보고 대상 범위)에 속하는지 — 매칭된 포지션의 설계시트 기준으로 판정한다.
+    function isInScope(m, scope) {
+      if (!scope || scope.mode !== 'scoped') return true;
+      const sheet = sheetsData.find(s => s.name === m.position);
+      if (!sheet) return false;
+      const team = (sheet.team || '').trim();
+      const reportTo = (sheet.reportTo || '').trim();
+      return (scope.pairs || []).some(p => p.team === team && (p.reportTo || '') === reportTo);
+    }
+
+    // 로그인 계정 기준으로 이 지원자(면접 대상자)를 열람할 수 있는지. 채용 관리자(현업 팀장)에게만 범위 제한을 적용한다.
+    function canViewCandidate(m) {
+      if (!currentUser || currentUserRole !== '채용 관리자 (현업 팀장)') return true;
+      return isInScope(m, currentUser.permissions?.candidateScope);
+    }
+
+    function renderPermScopeList(checkedPairs) {
+      const wrap = document.getElementById('perm-scope-list');
+      if (!wrap) return;
+      const pairs = distinctTeamReportPairs();
+      if (!pairs.length) {
+        wrap.innerHTML = '<span class="text-gray text-sm">등록된 설계시트에 팀 정보가 없습니다. 먼저 설계시트에 팀을 입력하세요.</span>';
+        return;
+      }
+      wrap.innerHTML = pairs.map((p, i) => {
+        const checked = checkedPairs.some(cp => cp.team === p.team && (cp.reportTo || '') === p.reportTo);
+        const label = p.reportTo ? `${p.team} · ${p.reportTo}` : p.team;
+        return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="checkbox" data-scope-pair="${i}" data-team="${escHtml(p.team)}" data-report-to="${escHtml(p.reportTo)}" ${checked ? 'checked' : ''} />
+      ${escHtml(label)}
+    </label>`;
+      }).join('');
+    }
+
+    function onPermScopeModeChange() {
+      const scoped = document.getElementById('perm-scope-mode-scoped')?.checked;
+      const list = document.getElementById('perm-scope-list');
+      if (list) list.style.opacity = scoped ? '1' : '0.5';
+      list?.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.disabled = !scoped; });
+    }
 
     function openUserPerms(id) {
       const u = usersData.find(x => x.id === id);
@@ -3384,6 +3448,17 @@ ${m.extractedText.substring(0, 3000)}
       document.querySelectorAll('#modal-user-perms input[data-perm]').forEach(cb => {
         cb.checked = !!perms[cb.dataset.perm];
       });
+
+      const scopeSection = document.getElementById('perm-scope-section');
+      const isScopableRole = u.role === '채용 관리자 (현업 팀장)';
+      if (scopeSection) scopeSection.style.display = isScopableRole ? '' : 'none';
+      if (isScopableRole) {
+        const scope = Object.assign({ mode: 'all', pairs: [] }, perms.candidateScope || {});
+        const modeEl = document.getElementById(scope.mode === 'scoped' ? 'perm-scope-mode-scoped' : 'perm-scope-mode-all');
+        if (modeEl) modeEl.checked = true;
+        renderPermScopeList(scope.pairs || []);
+        onPermScopeModeChange();
+      }
       openModal('modal-user-perms');
     }
 
@@ -3394,11 +3469,20 @@ ${m.extractedText.substring(0, 3000)}
       document.querySelectorAll('#modal-user-perms input[data-perm]').forEach(cb => {
         perms[cb.dataset.perm] = cb.checked;
       });
+      if (u.role === '채용 관리자 (현업 팀장)') {
+        const mode = document.getElementById('perm-scope-mode-scoped')?.checked ? 'scoped' : 'all';
+        const pairs = mode === 'scoped'
+          ? [...document.querySelectorAll('#perm-scope-list input[data-scope-pair]:checked')]
+              .map(cb => ({ team: cb.dataset.team, reportTo: cb.dataset.reportTo }))
+          : [];
+        perms.candidateScope = { mode, pairs };
+      }
       u.permissions = perms;
       saveData();
       closeModal('modal-user-perms');
       addAuditLog(currentUserName(), '권한 변경', u.email);
       showToast(`${u.name}님의 권한이 저장되었습니다.`, 'success');
+      if (u.id === currentUser?.id) { filterMatching(); renderReports(); renderDashboard(); }
     }
 
     function confirmDeactivate() {

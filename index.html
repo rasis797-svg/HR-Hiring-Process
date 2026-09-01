@@ -1561,6 +1561,25 @@
           <span>사용자 관리</span>
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-perm="user_manage" /> 허용</label>
         </div>
+
+        <div id="perm-scope-section" style="display:none;border-top:1px solid #eee;margin-top:4px;padding-top:14px">
+          <div class="flex items-center justify-between mb-8">
+            <span class="font-bold">면접 대상자 접근 범위</span>
+          </div>
+          <div class="text-gray text-sm mb-12">
+            "채용 관리자 (현업 팀장)"은 설계시트의 팀·보고 대상이 아래에서 선택한 범위와 일치하는 포지션의
+            지원자(면접 대상자)만 매칭 결과·리포트에서 열람할 수 있습니다.
+          </div>
+          <div class="flex flex-col mb-12" style="gap:6px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="radio" name="perm-scope-mode" id="perm-scope-mode-all" value="all" onchange="onPermScopeModeChange()" /> 전체 포지션 열람
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="radio" name="perm-scope-mode" id="perm-scope-mode-scoped" value="scoped" onchange="onPermScopeModeChange()" /> 지정한 팀 · 보고 대상만 열람
+            </label>
+          </div>
+          <div id="perm-scope-list" class="flex flex-col" style="gap:6px;max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:10px"></div>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-user-perms')">취소</button>
