@@ -106,7 +106,16 @@
       try {
         me = await DB.linkCurrentUser();
       } catch (e) {
-        showToast(`계정 확인 실패: ${e.message || e}`, 'error');
+        // RPC 자체가 없다는 것은 DB 마이그레이션이 아직 안 됐다는 뜻이다.
+        // 원문 오류만 띄우면 무엇을 해야 하는지 알 수 없으므로 안내를 붙인다.
+        const raw = (e && (e.message || e.code)) || '';
+        const notMigrated = /link_current_user|PGRST202|schema cache|404/i.test(raw);
+        showToast(
+          notMigrated
+            ? 'DB 마이그레이션이 적용되지 않았습니다. Supabase SQL Editor 에서 sql/001 → 002 → 003 을 먼저 실행하세요.'
+            : `계정 확인 실패: ${raw || e}`,
+          'error'
+        );
         await sbClient.auth.signOut();
         return false;
       }
