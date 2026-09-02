@@ -1140,7 +1140,7 @@
       // 폼 초기화
       clearResumeFile(); resumeExtractedText = '';
       document.getElementById('resume-paste-text').value = ''; updatePasteCount();
-      document.getElementById('upload-position-select').value = '';
+      setUploadPosition('');
       document.getElementById('upload-applicant-name').value = '';
       document.getElementById('upload-channel-select').value = '';
       switchResumeTab('file');
@@ -1163,6 +1163,35 @@
         uploadSel.innerHTML = '<option value="">포지션을 선택하세요</option>' +
           positions.map(p => `<option value="${escHtml(p)}"${cur === p ? ' selected' : ''}>${escHtml(p)}</option>`).join('');
       }
+      renderUploadPositionRadios();
+    }
+
+    // 채용 진행중(채용중) 포지션만 라디오 버튼으로 빠르게 고를 수 있게 한다.
+    // 준비중/채용완료 포지션까지 필요하면 위 드롭다운으로 선택하면 된다.
+    function renderUploadPositionRadios() {
+      const wrap = document.getElementById('upload-position-radios');
+      if (!wrap) return;
+      const open = sheetsData.filter(s => getPosStatus(s) === '채용중');
+      if (!open.length) {
+        wrap.innerHTML = '<span class="text-gray text-sm">채용 진행중인 포지션이 없습니다.</span>';
+        return;
+      }
+      const selected = document.getElementById('upload-position-select')?.value || '';
+      wrap.innerHTML = open.map(s => `
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="radio" name="upload-position-radio" value="${escHtml(s.name)}"
+        ${selected === s.name ? 'checked' : ''} onchange="setUploadPosition('${s.name.replace(/'/g, "\\'")}')" />
+      ${escHtml(s.name)}
+    </label>`).join('');
+    }
+
+    // 드롭다운과 라디오 버튼, 어느 쪽으로 골라도 서로 맞춰준다.
+    function setUploadPosition(name) {
+      const sel = document.getElementById('upload-position-select');
+      if (sel) sel.value = name;
+      document.querySelectorAll('#upload-position-radios input[type=radio]').forEach(r => {
+        r.checked = (r.value === name);
+      });
     }
 
     function renderMatching(data) {
@@ -1295,11 +1324,60 @@
       showToast(m.rejected ? `"${m.applicant}" 불합격 처리되었습니다.` : `"${m.applicant}" 불합격이 취소되었습니다.`, m.rejected ? 'error' : 'success');
     }
 
+    // 매칭 목록의 연도/월 필터. 드롭다운이 매번 다시 그려지므로(옵션이 데이터에 따라
+    // 바뀜) select의 value 대신 이 변수를 기준으로 삼아 "당해/당월/전월" 버튼이
+    // 데이터 유무와 무관하게 정확한 연/월로 이동할 수 있게 한다.
+    let matchFilterYear = '';
+    let matchFilterMonth = '';
+
+    function onMatchFilterYearChange() {
+      matchFilterYear = document.getElementById('matching-filter-year').value;
+      filterMatching();
+    }
+
+    function onMatchFilterMonthChange() {
+      matchFilterMonth = document.getElementById('matching-filter-month').value;
+      filterMatching();
+    }
+
+    // mode: 'year'(당해) | 'month'(당월) | 'prev'(전월)
+    function jumpMatchFilter(mode) {
+      const now = new Date();
+      if (mode === 'year') {
+        matchFilterYear = String(now.getFullYear());
+        matchFilterMonth = '';
+      } else if (mode === 'month') {
+        matchFilterYear = String(now.getFullYear());
+        matchFilterMonth = String(now.getMonth() + 1).padStart(2, '0');
+      } else if (mode === 'prev') {
+        let y = now.getFullYear();
+        let m = now.getMonth(); // 1-based 이전 달 번호 (1월이면 0 → 작년 12월로 보정)
+        if (m === 0) { m = 12; y -= 1; }
+        matchFilterYear = String(y);
+        matchFilterMonth = String(m).padStart(2, '0');
+      }
+      filterMatching();
+    }
+
     function filterMatching() {
       const pos = document.getElementById('matching-filter-position').value;
       const sort = document.getElementById('matching-filter-sort').value;
       const exclDone = document.getElementById('matching-exclude-completed')?.checked;
       const rejFilter = document.getElementById('matching-filter-rejected')?.value || '';
+
+      // 연도 옵션 동적 생성 — 데이터에 있는 연도 + 당해 + 현재 선택값은 항상 포함
+      const yearSel = document.getElementById('matching-filter-year');
+      if (yearSel) {
+        const years = new Set(matchingData.map(m => (m.date || '').slice(0, 4)).filter(Boolean));
+        years.add(String(new Date().getFullYear()));
+        if (matchFilterYear) years.add(matchFilterYear);
+        const sorted = [...years].sort().reverse();
+        yearSel.innerHTML = '<option value="">전체 연도</option>' +
+          sorted.map(y => `<option value="${y}"${matchFilterYear === y ? ' selected' : ''}>${y}년</option>`).join('');
+      }
+      const monthSel = document.getElementById('matching-filter-month');
+      if (monthSel) monthSel.value = matchFilterMonth;
+
       let rows = matchingData.filter(canViewCandidate);
       if (pos) rows = rows.filter(m => m.position === pos);
       if (exclDone) {
@@ -1311,6 +1389,8 @@
       else if (rejFilter === '과제/공통면접') rows = rows.filter(m => m.procStatus === '과제/공통면접');
       else if (rejFilter === '최종면접') rows = rows.filter(m => m.procStatus === '최종면접');
       else if (rejFilter === '최종합격') rows = rows.filter(m => m.procStatus === '최종합격');
+      if (matchFilterYear) rows = rows.filter(m => (m.date || '').startsWith(matchFilterYear));
+      if (matchFilterMonth) rows = rows.filter(m => (m.date || '').replace(/\./g, '-').split('-')[1] === matchFilterMonth);
       if (sort === 'score-desc') rows.sort((a, b) => parseFloat(b.score) - parseFloat(a.score));
       else if (sort === 'score-asc') rows.sort((a, b) => parseFloat(a.score) - parseFloat(b.score));
       renderMatching(rows);
@@ -2985,22 +3065,59 @@ ${m.extractedText.substring(0, 3000)}
       showToast(`포지션 상태가 "${status || '자동'}"으로 변경되었습니다.`, 'success');
     }
 
+    // 포지션 목록의 연도/월 필터는 기본으로 당월을 가리키고, </> 버튼으로 이동한다.
+    // select의 value를 그때그때 읽는 대신 이 변수를 기준으로 삼아야, 데이터가 없는
+    // 달로 이동해도(연도 옵션이 동적으로 사라지지 않게) 정확히 그 달을 유지할 수 있다.
+    let posFilterYear = String(new Date().getFullYear());
+    let posFilterMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+
+    function onPosFilterYearChange() {
+      posFilterYear = document.getElementById('pos-filter-year').value;
+      renderPositions();
+    }
+
+    function onPosFilterMonthChange() {
+      posFilterMonth = document.getElementById('pos-filter-month').value;
+      renderPositions();
+    }
+
+    function shiftPosMonth(delta) {
+      const now = new Date();
+      let y = parseInt(posFilterYear || String(now.getFullYear()), 10);
+      let m = parseInt(posFilterMonth || String(now.getMonth() + 1), 10);
+      m += delta;
+      if (m < 1) { m = 12; y -= 1; }
+      else if (m > 12) { m = 1; y += 1; }
+      posFilterYear = String(y);
+      posFilterMonth = String(m).padStart(2, '0');
+      renderPositions();
+    }
+
     function resetPosFilters() {
-      ['pos-filter-status', 'pos-filter-team', 'pos-filter-year', 'pos-filter-month'].forEach(id => {
+      ['pos-filter-status', 'pos-filter-team'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
+      const now = new Date();
+      posFilterYear = String(now.getFullYear());
+      posFilterMonth = String(now.getMonth() + 1).padStart(2, '0');
       renderPositions();
     }
 
     function renderPositions() {
-      // 연도 필터 옵션 동적 생성
+      // 연도 필터 옵션 동적 생성 — 데이터에 있는 연도 + 당월(기본값)은 항상 포함해
+      // </> 로 이동했을 때 옵션이 없어 선택이 풀리는 일이 없게 한다.
       const yearSel = document.getElementById('pos-filter-year');
-      if (yearSel && sheetsData.length > 0) {
-        const years = [...new Set(sheetsData.map(s => (s.created || '').substring(0, 4)).filter(Boolean))].sort().reverse();
-        const curY = yearSel.value;
-        yearSel.innerHTML = '<option value="">전체 연도</option>' + years.map(y => `<option value="${y}"${curY === y ? ' selected' : ''}>${y}년</option>`).join('');
+      if (yearSel) {
+        const years = new Set(sheetsData.map(s => (s.created || '').substring(0, 4)).filter(Boolean));
+        years.add(String(new Date().getFullYear()));
+        if (posFilterYear) years.add(posFilterYear);
+        const sorted = [...years].sort().reverse();
+        yearSel.innerHTML = '<option value="">전체 연도</option>' + sorted.map(y => `<option value="${y}"${posFilterYear === y ? ' selected' : ''}>${y}년</option>`).join('');
       }
+
+      const monthSel = document.getElementById('pos-filter-month');
+      if (monthSel) monthSel.value = posFilterMonth;
 
       // 팀 필터 옵션 동적 생성
       const teamSel = document.getElementById('pos-filter-team');
@@ -3012,8 +3129,8 @@ ${m.extractedText.substring(0, 3000)}
 
       const filterStatus = document.getElementById('pos-filter-status')?.value || '';
       const filterTeam = document.getElementById('pos-filter-team')?.value || '';
-      const filterYear = document.getElementById('pos-filter-year')?.value || '';
-      const filterMonth = document.getElementById('pos-filter-month')?.value || '';
+      const filterYear = posFilterYear;
+      const filterMonth = posFilterMonth;
 
       const tbody = document.getElementById('positions-tbody');
       if (sheetsData.length === 0) {
