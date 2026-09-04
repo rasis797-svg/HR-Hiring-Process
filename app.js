@@ -1359,6 +1359,52 @@
       filterMatching();
     }
 
+    // 테이블 헤더 클릭 정렬. "정렬" 드롭다운(최신순/점수순)과는 별개 기준이며,
+    // 헤더를 클릭하면 드롭다운보다 우선 적용된다. 드롭다운을 다시 고르면 해제된다.
+    let matchSortField = null;
+    let matchSortDir = 'asc';
+
+    function matchSortValue(m, field) {
+      const scoreNum = parseFloat(m.score) || 0;
+      switch (field) {
+        case 'applicant': return (m.applicant || '').toLowerCase();
+        case 'position': return (m.position || '').toLowerCase();
+        case 'score': return scoreNum;
+        case 'sub1': return parseFloat(m.sub1 || (scoreNum * 0.9 + 0.1).toFixed(1));
+        case 'sub2': return parseFloat(m.sub2 || (scoreNum * 0.95 + 0.05).toFixed(1));
+        case 'sub3': return parseFloat(m.sub3 || (scoreNum * 0.85 + 0.1).toFixed(1));
+        case 'channel': return (m.channel || '').toLowerCase();
+        case 'date': return m.date || '';
+        default: return '';
+      }
+    }
+
+    function sortMatchingBy(field) {
+      if (matchSortField === field) {
+        matchSortDir = matchSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        matchSortField = field;
+        matchSortDir = 'asc';
+      }
+      filterMatching();
+    }
+
+    function onMatchSortDropdownChange() {
+      matchSortField = null; // 드롭다운을 직접 고르면 헤더 클릭 정렬은 해제
+      filterMatching();
+    }
+
+    function updateMatchSortHeaders() {
+      document.querySelectorAll('#page-matching thead th.th-sortable .sort-arrow').forEach(el => el.remove());
+      if (!matchSortField) return;
+      const th = document.getElementById('mth-' + matchSortField);
+      if (!th) return;
+      const arrow = document.createElement('span');
+      arrow.className = 'sort-arrow';
+      arrow.textContent = matchSortDir === 'asc' ? '▲' : '▼';
+      th.appendChild(arrow);
+    }
+
     function filterMatching() {
       const pos = document.getElementById('matching-filter-position').value;
       const sort = document.getElementById('matching-filter-sort').value;
@@ -1391,9 +1437,19 @@
       else if (rejFilter === '최종합격') rows = rows.filter(m => m.procStatus === '최종합격');
       if (matchFilterYear) rows = rows.filter(m => (m.date || '').startsWith(matchFilterYear));
       if (matchFilterMonth) rows = rows.filter(m => (m.date || '').replace(/\./g, '-').split('-')[1] === matchFilterMonth);
-      if (sort === 'score-desc') rows.sort((a, b) => parseFloat(b.score) - parseFloat(a.score));
+      if (matchSortField) {
+        rows.sort((a, b) => {
+          const va = matchSortValue(a, matchSortField);
+          const vb = matchSortValue(b, matchSortField);
+          const cmp = typeof va === 'number' && typeof vb === 'number'
+            ? va - vb
+            : String(va).localeCompare(String(vb), 'ko');
+          return matchSortDir === 'asc' ? cmp : -cmp;
+        });
+      } else if (sort === 'score-desc') rows.sort((a, b) => parseFloat(b.score) - parseFloat(a.score));
       else if (sort === 'score-asc') rows.sort((a, b) => parseFloat(a.score) - parseFloat(b.score));
       renderMatching(rows);
+      updateMatchSortHeaders();
     }
 
     // ══════════════════════════════════════════════════
@@ -1833,6 +1889,7 @@ interview_questions.role_based는 6~10개, career_issues는 경력 이슈가 없
               m.score = String(m.analysis.overall);
               renderMatching();
             }
+            saveData(); // 저장을 빼먹으면 리포트가 로컬에만 남아 있다가 다음 클라우드 동기화 때 사라진다
           }
           document.getElementById('rd-generating').style.display = 'none';
           renderReportBody(m, aiResult.interview_questions, sheet);
@@ -3065,11 +3122,12 @@ ${m.extractedText.substring(0, 3000)}
       showToast(`포지션 상태가 "${status || '자동'}"으로 변경되었습니다.`, 'success');
     }
 
-    // 포지션 목록의 연도/월 필터는 기본으로 당월을 가리키고, </> 버튼으로 이동한다.
+    // 포지션 목록의 연도/월 필터. 연도는 올해를 기본값으로 하고 월은 전체이며,
+    // </> 로 한 달씩 이동하거나 "당월" 버튼으로 오늘 기준 연/월로 바로 이동할 수 있다.
     // select의 value를 그때그때 읽는 대신 이 변수를 기준으로 삼아야, 데이터가 없는
     // 달로 이동해도(연도 옵션이 동적으로 사라지지 않게) 정확히 그 달을 유지할 수 있다.
     let posFilterYear = String(new Date().getFullYear());
-    let posFilterMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+    let posFilterMonth = '';
 
     function onPosFilterYearChange() {
       posFilterYear = document.getElementById('pos-filter-year').value;
@@ -3093,14 +3151,26 @@ ${m.extractedText.substring(0, 3000)}
       renderPositions();
     }
 
+    function jumpPosThisMonth() {
+      const now = new Date();
+      posFilterYear = String(now.getFullYear());
+      posFilterMonth = String(now.getMonth() + 1).padStart(2, '0');
+      renderPositions();
+    }
+
+    // 연도는 그대로 두고 월만 전체로 — 선택한 연도의 전체 달을 보고 싶을 때 쓴다.
+    function clearPosMonth() {
+      posFilterMonth = '';
+      renderPositions();
+    }
+
     function resetPosFilters() {
       ['pos-filter-status', 'pos-filter-team'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
-      const now = new Date();
-      posFilterYear = String(now.getFullYear());
-      posFilterMonth = String(now.getMonth() + 1).padStart(2, '0');
+      posFilterYear = '';
+      posFilterMonth = '';
       renderPositions();
     }
 

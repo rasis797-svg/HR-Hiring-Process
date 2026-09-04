@@ -324,6 +324,8 @@
               </select>
               <button class="btn btn-secondary btn-sm" style="padding:5px 9px" onclick="shiftPosMonth(1)" title="다음월">&gt;</button>
             </div>
+            <button class="btn btn-secondary btn-sm" onclick="jumpPosThisMonth()">당월</button>
+            <button class="btn btn-secondary btn-sm" onclick="clearPosMonth()">전체월</button>
             <button class="btn btn-secondary btn-sm" onclick="resetPosFilters()">필터 초기화</button>
           </div>
           <div class="table-wrap">
@@ -622,7 +624,7 @@
             <select id="matching-filter-position" class="form-control" style="width:240px" onchange="filterMatching()">
               <option value="">전체 포지션</option>
             </select>
-            <select id="matching-filter-sort" class="form-control" style="width:160px" onchange="filterMatching()">
+            <select id="matching-filter-sort" class="form-control" style="width:160px" onchange="onMatchSortDropdownChange()">
               <option value="latest">최신순</option>
               <option value="score-desc">점수 높은 순</option>
               <option value="score-asc">점수 낮은 순</option>
@@ -669,15 +671,15 @@
             <table>
               <thead>
                 <tr>
-                  <th>지원자명</th>
-                  <th>포지션</th>
+                  <th id="mth-applicant" class="th-sortable" onclick="sortMatchingBy('applicant')">지원자명</th>
+                  <th id="mth-position" class="th-sortable" onclick="sortMatchingBy('position')">포지션</th>
                   <th style="min-width:160px">상태</th>
-                  <th>종합점수</th>
-                  <th>역량레벨</th>
-                  <th>필수기술</th>
-                  <th>결정적무기</th>
-                  <th>유입채널</th>
-                  <th>분석일</th>
+                  <th id="mth-score" class="th-sortable" onclick="sortMatchingBy('score')">종합점수</th>
+                  <th id="mth-sub1" class="th-sortable" onclick="sortMatchingBy('sub1')">역량레벨</th>
+                  <th id="mth-sub2" class="th-sortable" onclick="sortMatchingBy('sub2')">필수기술</th>
+                  <th id="mth-sub3" class="th-sortable" onclick="sortMatchingBy('sub3')">결정적무기</th>
+                  <th id="mth-channel" class="th-sortable" onclick="sortMatchingBy('channel')">유입채널</th>
+                  <th id="mth-date" class="th-sortable" onclick="sortMatchingBy('date')">분석일</th>
                   <th style="width:220px">작업</th>
                 </tr>
               </thead>
